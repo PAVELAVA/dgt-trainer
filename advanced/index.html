@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#23272b">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>DGT · Тренажёр 2 · Расширенный</title>
+<style>
+  :root{
+    --asphalt:#23272b;
+    --line:#e3e6e9;
+    --paper:#f7f8f9;
+    --blue:#0a4ea3;      /* предписывающий знак */
+    --red:#c8102e;       /* запрещающий знак */
+    --green:#1c7c43;     /* указательный (автомагистраль ES) */
+    --amber:#e2a400;
+    --ink:#1b1f23;
+    --muted:#6b7480;
+    --radius:14px;
+    font-size:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+  html{height:100%}
+  body{
+    font-family:-apple-system,'Segoe UI',Roboto,sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    height:100vh;height:100dvh;
+    overflow:hidden;position:fixed;inset:0;width:100%;
+    display:flex;flex-direction:column;
+  }
+  header{
+    background:var(--asphalt);
+    color:#fff;
+    padding:calc(14px + env(safe-area-inset-top)) 16px 12px;
+  }
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand .sign{
+    width:34px;height:34px;border-radius:50%;
+    background:var(--green);border:3px solid #fff;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:15px;color:#fff;
+    flex-shrink:0;
+  }
+  .brand h1{font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:1.15rem;letter-spacing:.02em;text-transform:uppercase}
+  .brand small{display:block;font-family:-apple-system;font-weight:400;font-size:.72rem;color:#aab2bb;letter-spacing:.04em;text-transform:none}
+  /* дорожная разметка под шапкой */
+  .roadline{height:6px;background:var(--asphalt);position:relative}
+  .roadline::after{
+    content:"";position:absolute;left:0;right:0;top:50%;height:2px;transform:translateY(-50%);
+    background:repeating-linear-gradient(90deg,#fff 0 26px,transparent 26px 44px);
+  }
+  nav{
+    display:flex;background:#fff;border-bottom:1px solid var(--line);
+    flex-shrink:0;
+  }
+  nav button{
+    flex:1;padding:12px 4px;border:0;background:none;cursor:pointer;
+    font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:600;font-size:.95rem;
+    text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+    border-bottom:3px solid transparent;
+  }
+  nav button.active{color:var(--blue);border-bottom-color:var(--blue)}
+  main{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:16px;max-width:560px;width:100%;margin:0 auto}
+
+  /* ---- прогресс ---- */
+  .progress{margin-bottom:14px}
+  .bigstat{font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:1.25rem;margin-bottom:6px;letter-spacing:.02em}
+  .bigstat b{color:var(--green)}
+  .reset-link.armed{color:#fff !important;background:var(--red);padding:6px 12px;border-radius:8px}
+  .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--asphalt);color:#fff;padding:11px 20px;border-radius:10px;font-size:.88rem;z-index:99;box-shadow:0 6px 18px rgba(0,0,0,.35);white-space:nowrap}
+  .progress .bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden;display:flex}
+  .progress .seg{height:100%}
+  .progress .labels{display:flex;justify-content:space-between;font-size:.72rem;color:var(--muted);margin-top:5px}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:.72rem;color:var(--muted);margin-top:4px}
+  .reset-link{display:block;margin:8px 0 0 auto;background:none;border:0;color:var(--red);font-size:.74rem;font-weight:700;cursor:pointer;padding:4px 0;text-transform:uppercase;letter-spacing:.04em}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+
+  /* ---- карточка ---- */
+  .card-zone{perspective:1200px}
+  .flashcard{
+    position:relative;width:100%;height:clamp(300px, calc(100dvh - 500px), 540px);cursor:pointer;
+    transform-style:preserve-3d;-webkit-transform-style:preserve-3d;
+    transition:transform .45s cubic-bezier(.4,.1,.2,1);
+  }
+  .flashcard.flipped{transform:rotateY(180deg)}
+  .face{
+    position:absolute;inset:0;overflow:hidden;
+    backface-visibility:hidden;-webkit-backface-visibility:hidden;
+    background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:0 4px 14px rgba(20,30,40,.07);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:20px 22px;text-align:center;
+  }
+  .face.back{transform:rotateY(180deg);background:var(--asphalt);color:#fff;border-color:var(--asphalt)}
+  .word{font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:2rem;line-height:1.1}
+  .face.back .word{font-size:1.7rem}
+  .grouptag{
+    font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;font-weight:700;
+    padding:3px 10px;border-radius:20px;margin-bottom:14px;
+  }
+  .hintline{font-size:.85rem;color:var(--muted);margin-top:12px;font-style:italic}
+  .face.back .hintline{color:#aab2bb}
+  .taphint{position:absolute;bottom:10px;left:0;right:0;font-size:.7rem;color:#b6bcc4;text-transform:uppercase;letter-spacing:.08em}
+  .boxbadge{position:absolute;top:10px;right:12px;font-size:.68rem;color:#b6bcc4;font-weight:600}
+
+  .answers{display:flex;gap:10px;margin-top:14px}
+  .answers button{
+    flex:1;padding:15px 0;border:0;border-radius:var(--radius);cursor:pointer;
+    font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:1.05rem;
+    text-transform:uppercase;letter-spacing:.04em;color:#fff;
+  }
+  .btn-no{background:var(--red)}
+  .btn-yes{background:var(--green)}
+  .answers button:disabled{opacity:.35;cursor:default}
+  .session-info{font-size:.8rem;color:var(--muted);text-align:center;margin-top:12px}
+  .done-banner{
+    background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+    padding:32px 20px;text-align:center;
+  }
+  .done-banner .sign-ok{
+    width:64px;height:64px;border-radius:50%;background:var(--blue);
+    margin:0 auto 14px;display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:1.8rem;border:4px solid #cdd9ea;
+  }
+  .done-banner h2{font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-size:1.3rem;margin-bottom:6px}
+  .done-banner p{font-size:.9rem;color:var(--muted)}
+  .primary-btn{
+    margin-top:16px;padding:13px 26px;border:0;border-radius:var(--radius);
+    background:var(--blue);color:#fff;cursor:pointer;
+    font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:1rem;
+    text-transform:uppercase;letter-spacing:.04em;
+  }
+  .ghost-btn{
+    margin-top:10px;padding:10px 22px;border:1px solid var(--line);border-radius:var(--radius);
+    background:#fff;color:var(--muted);cursor:pointer;font-size:.85rem;
+  }
+  .filter-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:10px;scrollbar-width:none}
+  .filter-row::-webkit-scrollbar{display:none}
+  .chip{
+    flex-shrink:0;padding:7px 13px;border-radius:20px;border:1px solid var(--line);
+    background:#fff;font-size:.78rem;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;
+  }
+  .chip.active{background:var(--asphalt);color:#fff;border-color:var(--asphalt)}
+
+  /* ---- тест ---- */
+  .quiz-q{
+    background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+    padding:22px 18px;text-align:center;margin-bottom:14px;
+  }
+  .quiz-q .word{font-size:1.6rem}
+  .quiz-q .dirlabel{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px}
+  .opts{display:flex;flex-direction:column;gap:9px}
+  .opts button{
+    padding:14px 16px;border:1px solid var(--line);border-radius:var(--radius);
+    background:#fff;font-size:1rem;font-weight:600;cursor:pointer;text-align:left;color:var(--ink);
+  }
+  .opts button.correct{background:#e6f3ea;border-color:var(--green);color:var(--green)}
+  .opts button.wrong{background:#fbe9ec;border-color:var(--red);color:var(--red)}
+  .quiz-progress{font-size:.8rem;color:var(--muted);text-align:center;margin-bottom:10px}
+  .quiz-result{text-align:center;padding:30px 16px;background:#fff;border:1px solid var(--line);border-radius:var(--radius)}
+  .quiz-result .score{font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:3rem;color:var(--blue)}
+  .dir-toggle{display:flex;gap:8px;margin-bottom:12px}
+  .dir-toggle button{
+    flex:1;padding:10px;border:1px solid var(--line);border-radius:var(--radius);
+    background:#fff;font-size:.85rem;font-weight:600;color:var(--muted);cursor:pointer;
+  }
+  .dir-toggle button.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+  /* ---- список ---- */
+  .group-block{margin-bottom:18px}
+  .group-head{
+    display:flex;align-items:center;gap:8px;margin-bottom:8px;
+    font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:1rem;text-transform:uppercase;letter-spacing:.04em;
+  }
+  .group-head .dot{width:12px;height:12px;border-radius:50%;border:2.5px solid;flex-shrink:0}
+  .wordrow{
+    display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+    background:#fff;border:1px solid var(--line);border-radius:10px;
+    padding:9px 13px;margin-bottom:6px;font-size:.92rem;
+  }
+  .wordrow .en{font-weight:700}
+  .wordrow .ru{color:var(--muted);text-align:right}
+  .wordrow.learned .en::after{content:" ✓";color:var(--green)}
+  footer{font-size:.7rem;color:#b6bcc4;text-align:center;padding:14px 16px calc(22px + env(safe-area-inset-bottom))}
+  @media(prefers-reduced-motion:reduce){.flashcard{transition:none}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="sign">EN²</div>
+    <h1>DGT · Тренажёр 2<small>307 слов и фраз · расширенная лексика билетов</small></h1>
+  </div>
+</header>
+<div class="roadline"></div>
+<nav>
+  <button id="tab-learn" class="active" onclick="showTab('learn')">Учить</button>
+  <button id="tab-quiz" onclick="showTab('quiz')">Тест</button>
+  <button id="tab-list" onclick="showTab('list')">Слова</button>
+</nav>
+<main>
+  <div id="view-learn"></div>
+  <div id="view-quiz" style="display:none"></div>
+  <div id="view-list" style="display:none"></div>
+</main>
+
+<script>
+/* ===== Данные ===== */
+const GROUPS = {
+  modal: {name:'Модальность',            color:'#0a4ea3'},
+  link:  {name:'Связки и ловушки',       color:'#7a5c3e'},
+  act:   {name:'Действия водителя',      color:'#6b4fa0'},
+  road:  {name:'Дорога и полосы',        color:'#1c7c43'},
+  usr:   {name:'Участники и ТС',         color:'#0e7c86'},
+  sign:  {name:'Знаки и приоритет',      color:'#c8102e'},
+  spd:   {name:'Скорость и условия',     color:'#e2a400'},
+  light: {name:'Свет и сигналы',         color:'#b86b00'},
+  safe:  {name:'Безопасность и ДТП',     color:'#9c1b4e'},
+  alc:   {name:'Состояние водителя',     color:'#5f7a1f'},
+  tech:  {name:'Техника и обслуживание', color:'#444c55'},
+  doc:   {name:'Документы и штрафы',     color:'#2a5d8f'},
+  phr:   {name:'Экзаменационные фразы',  color:'#8a3ffc'}
+};
+const WORDS = [
+ {en:'Must',ru:'обязан',g:'modal'},
+ {en:'Must not',ru:'не должен, запрещено',g:'modal'},
+ {en:'Have to',ru:'должен, обязан',g:'modal'},
+ {en:'Do not have to',ru:'не обязан',g:'modal'},
+ {en:'Should not',ru:'не следует',g:'modal'},
+ {en:'May',ru:'может, разрешается',g:'modal'},
+ {en:'May not',ru:'нельзя, может быть запрещено',g:'modal'},
+ {en:'Can',ru:'может, умеет',g:'modal'},
+ {en:'Cannot',ru:'не может, нельзя',g:'modal'},
+ {en:'Permitted',ru:'разрешено',g:'modal'},
+ {en:'Prohibited',ru:'запрещено',g:'modal'},
+ {en:'Compulsory',ru:'обязательно',g:'modal'},
+ {en:'Optional',ru:'необязательно',g:'modal'},
+ {en:'Recommended',ru:'рекомендуется',g:'modal'},
+ {en:'Required',ru:'требуется',g:'modal'},
+ {en:'You are obliged to',ru:'вы обязаны',g:'modal'},
+ {en:'Obey',ru:'подчиняться',g:'modal'},
+ {en:'Unless',ru:'если только не',g:'link'},
+ {en:'Whether',ru:'ли',g:'link'},
+ {en:'Until',ru:'до тех пор, пока',g:'link'},
+ {en:'During',ru:'во время',g:'link'},
+ {en:'Either',ru:'либо, любой из двух',g:'link'},
+ {en:'Neither',ru:'ни один из двух',g:'link'},
+ {en:'Both',ru:'оба',g:'link'},
+ {en:'None',ru:'ни один',g:'link'},
+ {en:'Any',ru:'любой',g:'link'},
+ {en:'The previous',ru:'предыдущий',g:'link'},
+ {en:'Different',ru:'другой, отличающийся',g:'link'},
+ {en:'Similar',ru:'похожий',g:'link'},
+ {en:'Although',ru:'хотя',g:'link'},
+ {en:'However',ru:'однако',g:'link'},
+ {en:'Despite',ru:'несмотря на',g:'link'},
+ {en:'Instead of',ru:'вместо',g:'link'},
+ {en:'Rather than',ru:'вместо того чтобы',g:'link'},
+ {en:'As long as',ru:'при условии, что',g:'link'},
+ {en:'Provided that',ru:'при условии, что',g:'link'},
+ {en:'In order to',ru:'для того чтобы',g:'link'},
+ {en:'Due to',ru:'из-за',g:'link'},
+ {en:'Because of',ru:'из-за',g:'link'},
+ {en:'Therefore',ru:'поэтому',g:'link'},
+ {en:'Whereas',ru:'тогда как',g:'link'},
+ {en:'No longer',ru:'больше не',g:'link'},
+ {en:'Still',ru:'всё ещё',g:'link'},
+ {en:'Prior to',ru:'до, перед',g:'link'},
+ {en:'Suitable',ru:'подходящий',g:'link'},
+ {en:'Unsuitable',ru:'неподходящий',g:'link'},
+ {en:'Legal',ru:'законный',g:'link'},
+ {en:'Illegal',ru:'незаконный',g:'link'},
+ {en:'Immediately',ru:'немедленно',g:'link'},
+ {en:'As soon as possible',ru:'как можно скорее',g:'link'},
+ {en:'At most',ru:'максимум, не более',g:'link'},
+ {en:'No more than',ru:'не более чем',g:'link'},
+ {en:'In which case',ru:'в каком случае',g:'link'},
+ {en:'Regarding',ru:'относительно',g:'link'},
+ {en:'Pull up / Pull over',ru:'остановиться у обочины',g:'act'},
+ {en:'Move off / Set off',ru:'тронуться',g:'act'},
+ {en:'Proceed',ru:'продолжать движение',g:'act'},
+ {en:'Slow down',ru:'снизить скорость',g:'act'},
+ {en:'Speed up / Accelerate',ru:'ускориться',g:'act'},
+ {en:'Brake',ru:'тормозить',g:'act'},
+ {en:'Brake gently',ru:'тормозить плавно',g:'act'},
+ {en:'Brake sharply',ru:'резко тормозить',g:'act'},
+ {en:'Reverse',ru:'двигаться задним ходом',g:'act'},
+ {en:'Change lane',ru:'перестроиться',g:'act'},
+ {en:'Join traffic',ru:'въехать в поток',g:'act'},
+ {en:'Overtake',ru:'обгонять',g:'act'},
+ {en:'Pass',ru:'обогнать, проехать',g:'act'},
+ {en:'Yield',ru:'уступить',g:'act'},
+ {en:'Have priority',ru:'иметь преимущество',g:'act'},
+ {en:'Indicate',ru:'включить поворотник',g:'act'},
+ {en:'Signal',ru:'подать сигнал',g:'act'},
+ {en:'Prevent',ru:'предотвратить',g:'act'},
+ {en:'Check',ru:'проверить',g:'act'},
+ {en:'Make sure',ru:'убедиться',g:'act'},
+ {en:'Observe',ru:'наблюдать',g:'act'},
+ {en:'Watch out',ru:'быть внимательным',g:'act'},
+ {en:'Be aware',ru:'осознавать, быть внимательным',g:'act'},
+ {en:'Anticipate',ru:'предвидеть заранее',g:'act'},
+ {en:'React',ru:'реагировать',g:'act'},
+ {en:'Regain control',ru:'восстановить управление',g:'act'},
+ {en:'Tow',ru:'буксировать',g:'act'},
+ {en:'Load / Unload',ru:'загружать / разгружать',g:'act'},
+ {en:'Hold',ru:'держать',g:'act'},
+ {en:'Keep',ru:'сохранять, держать',g:'act'},
+ {en:'Keep a safe distance',ru:'держать безопасную дистанцию',g:'act'},
+ {en:'Wait',ru:'ждать',g:'act'},
+ {en:'Enter / Exit',ru:'въехать / выехать',g:'act'},
+ {en:'Cross',ru:'пересекать',g:'act'},
+ {en:'Carriageway',ru:'проезжая часть',g:'road'},
+ {en:'Lane',ru:'полоса движения',g:'road'},
+ {en:'Hard shoulder',ru:'обочина, аварийная полоса',g:'road'},
+ {en:'Verge',ru:'край дороги',g:'road'},
+ {en:'Pavement / Sidewalk',ru:'тротуар',g:'road'},
+ {en:'Kerb',ru:'бордюр',g:'road'},
+ {en:'Motorway',ru:'автомагистраль',g:'road'},
+ {en:'Dual carriageway',ru:'дорога с разделёнными проезжими частями',g:'road'},
+ {en:'Conventional road',ru:'обычная загородная дорога',g:'road'},
+ {en:'Built-up area',ru:'населённый пункт',g:'road'},
+ {en:'Residential area',ru:'жилая зона',g:'road'},
+ {en:'Cycle lane',ru:'велосипедная полоса',g:'road'},
+ {en:'Bus lane',ru:'полоса для автобусов',g:'road'},
+ {en:'Slip road',ru:'съезд, въездная дорога',g:'road'},
+ {en:'Junction / Intersection',ru:'перекрёсток',g:'road'},
+ {en:'Roundabout',ru:'круговое движение',g:'road'},
+ {en:'Bend / Curve',ru:'поворот, изгиб дороги',g:'road'},
+ {en:'Sharp bend',ru:'крутой поворот',g:'road'},
+ {en:'Slope',ru:'уклон',g:'road'},
+ {en:'Steep slope',ru:'крутой уклон',g:'road'},
+ {en:'Level crossing',ru:'железнодорожный переезд',g:'road'},
+ {en:'Tunnel',ru:'тоннель',g:'road'},
+ {en:'Underpass',ru:'подземный проезд',g:'road'},
+ {en:'Overpass',ru:'путепровод',g:'road'},
+ {en:'Roadworks',ru:'дорожные работы',g:'road'},
+ {en:'Diversion / Detour',ru:'объезд',g:'road'},
+ {en:'One-way street',ru:'одностороннее движение',g:'road'},
+ {en:'Oncoming traffic',ru:'встречный транспорт',g:'road'},
+ {en:'Traffic jam / Congestion',ru:'пробка, затор',g:'road'},
+ {en:'Queue',ru:'очередь, затор',g:'road'},
+ {en:'Road user',ru:'участник дорожного движения',g:'usr'},
+ {en:'Pedestrian',ru:'пешеход',g:'usr'},
+ {en:'Cyclist',ru:'велосипедист',g:'usr'},
+ {en:'Rider',ru:'водитель мото или вело',g:'usr'},
+ {en:'Elderly person',ru:'пожилой человек',g:'usr'},
+ {en:'Disabled person',ru:'человек с инвалидностью',g:'usr'},
+ {en:'Person with reduced mobility',ru:'человек с ограниченной мобильностью',g:'usr'},
+ {en:'Traffic officer',ru:'регулировщик',g:'usr'},
+ {en:'Emergency services',ru:'экстренные службы',g:'usr'},
+ {en:'Ambulance',ru:'скорая помощь',g:'usr'},
+ {en:'Tow truck',ru:'эвакуатор',g:'usr'},
+ {en:'Herd',ru:'стадо',g:'usr'},
+ {en:'Moped',ru:'мопед',g:'usr'},
+ {en:'Lorry / Truck',ru:'грузовик',g:'usr'},
+ {en:'Coach',ru:'междугородний автобус',g:'usr'},
+ {en:'Trailer',ru:'прицеп',g:'usr'},
+ {en:'Caravan',ru:'дом-прицеп',g:'usr'},
+ {en:'Vehicle combination',ru:'автопоезд',g:'usr'},
+ {en:'Towed vehicle',ru:'буксируемое ТС',g:'usr'},
+ {en:'Heavy vehicle',ru:'тяжёлое ТС',g:'usr'},
+ {en:'Slow-moving vehicle',ru:'тихоходное ТС',g:'usr'},
+ {en:'Personal mobility vehicle',ru:'средство индивидуальной мобильности',g:'usr'},
+ {en:'Priority vehicle',ru:'ТС с приоритетом',g:'usr'},
+ {en:'Stop sign',ru:'знак STOP',g:'sign'},
+ {en:'Give way sign',ru:'знак «Уступите дорогу»',g:'sign'},
+ {en:'Priority road',ru:'главная дорога',g:'sign'},
+ {en:'Minor road',ru:'второстепенная дорога',g:'sign'},
+ {en:'Pedestrian crossing',ru:'пешеходный переход',g:'sign'},
+ {en:'Zebra crossing',ru:'зебра',g:'sign'},
+ {en:'Barrier',ru:'шлагбаум',g:'sign'},
+ {en:'Traffic light',ru:'светофор',g:'sign'},
+ {en:'Amber light',ru:'жёлтый сигнал',g:'sign'},
+ {en:'Flashing amber light',ru:'мигающий жёлтый',g:'sign'},
+ {en:'Warning sign',ru:'предупреждающий знак',g:'sign'},
+ {en:'Prohibition sign',ru:'запрещающий знак',g:'sign'},
+ {en:'Mandatory sign',ru:'предписывающий знак',g:'sign'},
+ {en:'Road marking',ru:'дорожная разметка',g:'sign'},
+ {en:'Solid line',ru:'сплошная линия',g:'sign'},
+ {en:'Broken line',ru:'прерывистая линия',g:'sign'},
+ {en:'Stop line',ru:'стоп-линия',g:'sign'},
+ {en:'No entry',ru:'въезд запрещён',g:'sign'},
+ {en:'No overtaking',ru:'обгон запрещён',g:'sign'},
+ {en:'Speed limit',ru:'ограничение скорости',g:'sign'},
+ {en:'No parking',ru:'стоянка запрещена',g:'sign'},
+ {en:'No stopping',ru:'остановка запрещена',g:'sign'},
+ {en:'Dead end',ru:'тупик',g:'sign'},
+ {en:'Slippery road',ru:'скользкая дорога',g:'sign'},
+ {en:'Loose chippings',ru:'гравий, щебень на дороге',g:'sign'},
+ {en:'Toll road',ru:'платная дорога',g:'sign'},
+ {en:'Weight limit',ru:'ограничение массы',g:'sign'},
+ {en:'End of restrictions',ru:'конец ограничений',g:'sign'},
+ {en:'Block the junction',ru:'заблокировать перекрёсток',g:'sign'},
+ {en:'Clear the intersection',ru:'освободить перекрёсток',g:'sign'},
+ {en:'Stopping distance',ru:'остановочный путь',g:'spd'},
+ {en:'Braking distance',ru:'тормозной путь',g:'spd'},
+ {en:'Reaction time',ru:'время реакции',g:'spd'},
+ {en:'Safety distance',ru:'безопасная дистанция',g:'spd'},
+ {en:'Visibility',ru:'видимость',g:'spd'},
+ {en:'Poor visibility',ru:'плохая видимость',g:'spd'},
+ {en:'Grip / Traction',ru:'сцепление с дорогой',g:'spd'},
+ {en:'Loss of grip',ru:'потеря сцепления',g:'spd'},
+ {en:'Skid',ru:'занос',g:'spd'},
+ {en:'Aquaplaning',ru:'аквапланирование',g:'spd'},
+ {en:'Wet road',ru:'мокрая дорога',g:'spd'},
+ {en:'Black ice',ru:'гололёд, незаметный лёд',g:'spd'},
+ {en:'Crosswind',ru:'боковой ветер',g:'spd'},
+ {en:'Glare',ru:'ослепление',g:'spd'},
+ {en:'Low sun',ru:'низкое солнце',g:'spd'},
+ {en:'Pothole',ru:'яма на дороге',g:'spd'},
+ {en:'Standing water',ru:'вода на дороге',g:'spd'},
+ {en:'Drizzle',ru:'морось',g:'spd'},
+ {en:'Hail',ru:'град',g:'spd'},
+ {en:'Frost',ru:'заморозок, иней',g:'spd'},
+ {en:'Mist',ru:'дымка, лёгкий туман',g:'spd'},
+ {en:'Weather conditions',ru:'погодные условия',g:'spd'},
+ {en:'Adapt speed',ru:'адаптировать скорость',g:'spd'},
+ {en:'Inappropriate speed',ru:'неподходящая скорость',g:'spd'},
+ {en:'Hill crest',ru:'вершина подъёма',g:'spd'},
+ {en:'Safe gap',ru:'безопасный промежуток',g:'spd'},
+ {en:'Dipped headlights / Low beam',ru:'ближний свет',g:'light'},
+ {en:'Main beam / Full beam',ru:'дальний свет',g:'light'},
+ {en:'Sidelights / Position lights',ru:'габаритные огни',g:'light'},
+ {en:'Rear fog light',ru:'задняя противотуманка',g:'light'},
+ {en:'Brake lights',ru:'стоп-сигналы',g:'light'},
+ {en:'Reversing light',ru:'фонарь заднего хода',g:'light'},
+ {en:'Indicators',ru:'поворотники',g:'light'},
+ {en:'Hazard warning lights',ru:'аварийная сигнализация',g:'light'},
+ {en:'Horn',ru:'звуковой сигнал',g:'light'},
+ {en:'Flash the headlights',ru:'мигнуть фарами',g:'light'},
+ {en:'Dazzle',ru:'ослеплять',g:'light'},
+ {en:'Seat belt',ru:'ремень безопасности',g:'safe'},
+ {en:'Fasten',ru:'пристегнуть',g:'safe'},
+ {en:'Child restraint system',ru:'детское удерживающее устройство',g:'safe'},
+ {en:'Booster seat',ru:'бустер',g:'safe'},
+ {en:'Airbag',ru:'подушка безопасности',g:'safe'},
+ {en:'Head restraint',ru:'подголовник',g:'safe'},
+ {en:'Helmet',ru:'шлем',g:'safe'},
+ {en:'Reflective vest',ru:'светоотражающий жилет',g:'safe'},
+ {en:'Warning triangle',ru:'аварийный треугольник',g:'safe'},
+ {en:'V16 warning light',ru:'аварийный маяк V16',g:'safe'},
+ {en:'Fire extinguisher',ru:'огнетушитель',g:'safe'},
+ {en:'First aid',ru:'первая помощь',g:'safe'},
+ {en:'Accident',ru:'ДТП, авария',g:'safe'},
+ {en:'Crash / Collision',ru:'столкновение',g:'safe'},
+ {en:'Head-on collision',ru:'лобовое столкновение',g:'safe'},
+ {en:'Rear-end collision',ru:'столкновение сзади',g:'safe'},
+ {en:'Rollover',ru:'опрокидывание',g:'safe'},
+ {en:'Injury',ru:'травма',g:'safe'},
+ {en:'Casualty',ru:'пострадавший',g:'safe'},
+ {en:'Emergency call',ru:'экстренный вызов',g:'safe'},
+ {en:'Hazard',ru:'опасность',g:'safe'},
+ {en:'Obstacle',ru:'препятствие',g:'safe'},
+ {en:'Risk',ru:'риск',g:'safe'},
+ {en:'Blood alcohol level',ru:'уровень алкоголя в крови',g:'alc'},
+ {en:'Breath test',ru:'проверка на алкоголь',g:'alc'},
+ {en:'Legal limit',ru:'допустимый предел',g:'alc'},
+ {en:'Exceed the limit',ru:'превысить предел',g:'alc'},
+ {en:'Refuse a test',ru:'отказаться от теста',g:'alc'},
+ {en:'Drowsiness / Sleepiness',ru:'сонливость',g:'alc'},
+ {en:'Tiredness',ru:'усталость',g:'alc'},
+ {en:'Microsleep',ru:'микросон',g:'alc'},
+ {en:'Side effects',ru:'побочные эффекты',g:'alc'},
+ {en:'Medication',ru:'лекарственные препараты',g:'alc'},
+ {en:'Novice driver',ru:'начинающий водитель',g:'alc'},
+ {en:'Rest / Break',ru:'отдых, перерыв',g:'alc'},
+ {en:'Reflexes',ru:'рефлексы',g:'alc'},
+ {en:'Attention / Concentration',ru:'внимание, концентрация',g:'alc'},
+ {en:'Roadworthiness',ru:'техническая исправность',g:'tech'},
+ {en:'Maintenance',ru:'обслуживание',g:'tech'},
+ {en:'ITV',ru:'техосмотр (Испания)',g:'tech'},
+ {en:'Tyre',ru:'шина',g:'tech'},
+ {en:'Tread depth',ru:'глубина протектора',g:'tech'},
+ {en:'Worn tyre',ru:'изношенная шина',g:'tech'},
+ {en:'Flat tyre',ru:'спущенная шина',g:'tech'},
+ {en:'Blowout',ru:'разрыв шины',g:'tech'},
+ {en:'Spare wheel',ru:'запасное колесо',g:'tech'},
+ {en:'Tyre pressure',ru:'давление в шинах',g:'tech'},
+ {en:'Brake fluid',ru:'тормозная жидкость',g:'tech'},
+ {en:'Steering',ru:'рулевое управление',g:'tech'},
+ {en:'Suspension',ru:'подвеска',g:'tech'},
+ {en:'Coolant',ru:'охлаждающая жидкость',g:'tech'},
+ {en:'Windscreen',ru:'лобовое стекло',g:'tech'},
+ {en:'Wipers',ru:'дворники',g:'tech'},
+ {en:'Number plate',ru:'номерной знак',g:'tech'},
+ {en:'Exhaust / Emissions',ru:'выхлоп, выбросы',g:'tech'},
+ {en:'Fault',ru:'неисправность',g:'tech'},
+ {en:'Breakdown',ru:'поломка',g:'tech'},
+ {en:'Warning light',ru:'контрольная лампа',g:'tech'},
+ {en:'Dashboard',ru:'приборная панель',g:'tech'},
+ {en:'Handbrake',ru:'ручной тормоз',g:'tech'},
+ {en:'Driving licence',ru:'водительское удостоверение',g:'doc'},
+ {en:'Provisional licence',ru:'временное разрешение',g:'doc'},
+ {en:'Expired',ru:'просроченный',g:'doc'},
+ {en:'Renew',ru:'продлить',g:'doc'},
+ {en:'Apply for',ru:'подать заявление',g:'doc'},
+ {en:'Fee',ru:'пошлина',g:'doc'},
+ {en:'Fine',ru:'штраф',g:'doc'},
+ {en:'Penalty',ru:'наказание, взыскание',g:'doc'},
+ {en:'Offence / Violation',ru:'нарушение',g:'doc'},
+ {en:'Serious offence',ru:'серьёзное нарушение',g:'doc'},
+ {en:'Points',ru:'баллы',g:'doc'},
+ {en:'Lose points',ru:'потерять баллы',g:'doc'},
+ {en:'Recover points',ru:'восстановить баллы',g:'doc'},
+ {en:'Withdrawal',ru:'изъятие, лишение',g:'doc'},
+ {en:'Suspension (of licence)',ru:'приостановление действия прав',g:'doc'},
+ {en:'Disqualification',ru:'лишение права управления',g:'doc'},
+ {en:'Compulsory insurance',ru:'обязательная страховка',g:'doc'},
+ {en:'Policy',ru:'страховой полис',g:'doc'},
+ {en:'Registration document',ru:'регистрационный документ',g:'doc'},
+ {en:'Owner / Holder',ru:'владелец',g:'doc'},
+ {en:'Medical certificate',ru:'медицинская справка',g:'doc'},
+ {en:'What should you do?',ru:'Что вы должны сделать?',g:'phr'},
+ {en:'What is the safest option?',ru:'Какой вариант самый безопасный?',g:'phr'},
+ {en:'You must give way to…',ru:'Вы обязаны уступить…',g:'phr'},
+ {en:'You may overtake only if…',ru:'Можно обгонять, только если…',g:'phr'},
+ {en:'You must not enter…',ru:'Вы не должны въезжать…',g:'phr'},
+ {en:'It is advisable to use…',ru:'Рекомендуется использовать…',g:'phr'},
+ {en:'You may proceed with caution',ru:'Можно продолжить с осторожностью',g:'phr'},
+ {en:'You must obey the traffic officer',ru:'Обязаны подчиняться регулировщику',g:'phr'},
+ {en:'You must take special care',ru:'Нужно быть особенно осторожным',g:'phr'},
+ {en:'Before changing lanes',ru:'Перед перестроением',g:'phr'},
+ {en:'When approaching a junction',ru:'При приближении к перекрёстку',g:'phr'},
+ {en:'When visibility is reduced',ru:'Когда видимость снижена',g:'phr'},
+ {en:'In the event of an accident',ru:'В случае ДТП',g:'phr'},
+ {en:'You must make sure that…',ru:'Нужно убедиться, что…',g:'phr'},
+ {en:'You must adapt your speed',ru:'Обязаны адаптировать скорость',g:'phr'},
+ {en:'You should increase the safety distance',ru:'Следует увеличить дистанцию',g:'phr'},
+ {en:'When towing a trailer',ru:'При буксировке прицепа',g:'phr'},
+ {en:'You are not allowed to…',ru:'Вам не разрешается…',g:'phr'}
+];
+
+/* ===== Состояние (Лейтнер: 0–3) ===== */
+let boxes = WORDS.map(()=>0);
+const STORE_KEY = 'dgt-words2-v1';
+let storageOK = true;
+
+function loadState(){
+  try{
+    const r = localStorage.getItem(STORE_KEY);
+    if(r){
+      const s = JSON.parse(r);
+      if(Array.isArray(s.boxes) && s.boxes.length===WORDS.length) boxes = s.boxes;
+      if(s.filter) filterGroup = s.filter;
+      if(s.dir) qDir = s.dir;
+    }
+  }catch(e){ storageOK = false; }
+}
+function saveState(){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify({boxes, filter:filterGroup, dir:qDir, ts:Date.now()})); }
+  catch(e){ storageOK = false; }
+}
+/* страховка: сохраняем при сворачивании/закрытии */
+window.addEventListener('pagehide', saveState);
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveState(); });
+
+/* ===== Навигация ===== */
+function showTab(t){
+  currentTab=t;
+  ['learn','quiz','list'].forEach(x=>{
+    document.getElementById('view-'+x).style.display = (x===t)?'':'none';
+    document.getElementById('tab-'+x).classList.toggle('active',x===t);
+  });
+  if(t==='learn') renderLearn();
+  if(t==='quiz') renderQuizStart();
+  if(t==='list') renderList();
+}
+
+/* ===== Прогресс ===== */
+function progressHTML(){
+  const c=[0,0,0,0];
+  boxes.forEach(b=>c[b]++);
+  const n=WORDS.length;
+  const cols=['#d4d9de','#e2a400','#5a9bd4','#1c7c43'];
+  let segs='';
+  for(let i=0;i<4;i++) segs+=`<div class="seg" style="width:${(c[i]/n*100)}%;background:${cols[i]}"></div>`;
+  return `<div class="progress">
+    <div class="bigstat">Прогресс <b>${Math.round(boxes.reduce((s,b)=>s+b,0)/(3*n)*100)}%</b> · выучено ${c[3]} из ${n}</div>
+    <div class="bar">${segs}</div>
+    <div class="legend">
+      <span><i style="background:${cols[0]}"></i>новые ${c[0]}</span>
+      <span><i style="background:${cols[1]}"></i>коробка 1: ${c[1]}</span>
+      <span><i style="background:${cols[2]}"></i>коробка 2: ${c[2]}</span>
+      <span><i style="background:${cols[3]}"></i>выучено ${c[3]}</span>
+    </div>
+    <button class="reset-link" onclick="resetProgress()">⟲ Сбросить прогресс</button>
+  </div>`;
+}
+
+/* размер шрифта слова: крупный, но ужимается для длинных фраз */
+function wsize(t,back){
+  const L=t.length;
+  if(!back){ if(L<=8)return'4rem'; if(L<=14)return'3.1rem'; if(L<=22)return'2.4rem'; return'1.9rem'; }
+  else     { if(L<=10)return'3.4rem'; if(L<=18)return'2.6rem'; if(L<=28)return'2rem'; return'1.7rem'; }
+}
+
+/* ===== Режим «Учить» ===== */
+let session=[], idx=0, flipped=false, filterGroup='all';
+
+function buildSession(){
+  let pool = WORDS.map((w,i)=>({...w,i}))
+    .filter(w=> filterGroup==='all' || w.g===filterGroup);
+  // приоритет младшим коробкам; выученные (3) показываем редко
+  pool.sort((a,b)=> boxes[a.i]-boxes[b.i] || Math.random()-0.5);
+  const active = pool.filter(w=>boxes[w.i]<3);
+  session = (active.length? active : pool).slice(0,20);
+  shuffle(session);
+  idx=0; flipped=false;
+}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}}
+
+function renderLearn(){
+  const v=document.getElementById('view-learn');
+  const chips = `<div class="filter-row">
+    <button class="chip ${filterGroup==='all'?'active':''}" onclick="setFilter('all')">Все группы</button>
+    ${Object.entries(GROUPS).map(([k,g])=>
+      `<button class="chip ${filterGroup===k?'active':''}" onclick="setFilter('${k}')">${g.name}</button>`).join('')}
+  </div>`;
+  if(!session.length || idx>=session.length){
+    buildSession();
+  }
+  const learned = boxes.filter(b=>b===3).length;
+  if(learned===WORDS.length && filterGroup==='all'){
+    v.innerHTML = progressHTML()+chips+`
+      <div class="done-banner">
+        <div class="sign-ok">✓</div>
+        <h2>Все слова выучены</h2>
+        <p>Прогоните режим «Тест» в обе стороны для закрепления.</p>
+        <button class="ghost-btn" onclick="resetProgress()">Сбросить прогресс</button>
+      </div>`;
+    return;
+  }
+  const w = session[idx];
+  const g = GROUPS[w.g];
+  v.innerHTML = progressHTML()+chips+`
+    <div class="card-zone">
+      <div class="flashcard ${flipped?'flipped':''}" id="fc" onclick="flipCard()">
+        <div class="face front">
+          <span class="boxbadge">коробка ${boxes[w.i]}</span>
+          <span class="grouptag" style="background:${g.color}1a;color:${g.color}">${g.name}</span>
+          <div class="word" style="font-size:${wsize(w.en,false)}">${w.en}</div>
+          <div class="taphint">нажмите, чтобы перевернуть</div>
+        </div>
+        <div class="face back">
+          <div class="word" style="font-size:${wsize(w.ru,true)}">${w.ru}</div>
+          <div class="hintline">${w.en}</div>
+        </div>
+      </div>
+    </div>
+    <div class="answers">
+      <button class="btn-no" onclick="answer(false)" ${flipped?'':'disabled'}>Не знаю</button>
+      <button class="btn-yes" onclick="answer(true)" ${flipped?'':'disabled'}>Знаю</button>
+    </div>
+    <div class="session-info">Карточка ${idx+1} из ${session.length} в сессии</div>`;
+}
+function setFilter(g){filterGroup=g;session=[];saveState();renderLearn();}
+function flipCard(){flipped=!flipped;
+  document.getElementById('fc').classList.toggle('flipped',flipped);
+  document.querySelectorAll('.answers button').forEach(b=>b.disabled=!flipped);
+}
+function answer(knew){
+  const w=session[idx];
+  if(knew) boxes[w.i]=Math.min(3,boxes[w.i]+1);
+  else { boxes[w.i]=Math.max(0,boxes[w.i]-1);
+         session.push(w); } // вернётся в конец сессии
+  saveState();
+  idx++; flipped=false;
+  if(idx>=session.length){ buildSession(); }
+  renderLearn();
+}
+let resetArmed=false, resetTimer=null, currentTab='learn';
+function toast(msg){
+  const t=document.createElement('div');t.className='toast';t.textContent=msg;
+  document.body.appendChild(t);setTimeout(()=>t.remove(),2600);
+}
+function resetProgress(){
+  if(!resetArmed){
+    resetArmed=true;
+    document.querySelectorAll('.reset-link').forEach(b=>{
+      b.textContent='Точно сбросить? Нажмите ещё раз';b.classList.add('armed');
+    });
+    resetTimer=setTimeout(()=>{resetArmed=false;showTab(currentTab);},4000);
+    return;
+  }
+  clearTimeout(resetTimer);resetArmed=false;
+  boxes=WORDS.map(()=>0); saveState(); session=[];
+  showTab('learn');
+  toast('Прогресс сброшен: все 307 слов снова новые');
+}
+
+/* ===== Режим «Тест» ===== */
+let quiz=[], qIdx=0, qScore=0, qDir='en-ru', qLocked=false;
+
+function renderQuizStart(){
+  const v=document.getElementById('view-quiz');
+  v.innerHTML = progressHTML()+`
+    <div class="dir-toggle">
+      <button class="${qDir==='en-ru'?'active':''}" onclick="setDir('en-ru')">EN → RU</button>
+      <button class="${qDir==='ru-en'?'active':''}" onclick="setDir('ru-en')">RU → EN</button>
+    </div>
+    <div class="done-banner">
+      <h2>Тест: 10 вопросов</h2>
+      <p>Случайные слова, 4 варианта ответа. Перед экзаменом цель — стабильно 9–10 из 10.</p>
+      <button class="primary-btn" onclick="startQuiz()">Начать тест</button>
+    </div>`;
+}
+function setDir(d){qDir=d;saveState();renderQuizStart();}
+function startQuiz(){
+  const pool=WORDS.map((w,i)=>({...w,i}));
+  shuffle(pool);
+  quiz=pool.slice(0,10).map(w=>{
+    const wrong=pool.filter(x=>x.i!==w.i);
+    shuffle(wrong);
+    const opts=[w,...wrong.slice(0,3)];
+    shuffle(opts);
+    return {w,opts};
+  });
+  qIdx=0;qScore=0;qLocked=false;
+  renderQuestion();
+}
+function renderQuestion(){
+  const v=document.getElementById('view-quiz');
+  if(qIdx>=quiz.length){
+    v.innerHTML=`<div class="quiz-result">
+      <div class="score">${qScore}/${quiz.length}</div>
+      <p style="color:var(--muted);margin-bottom:6px">${qScore>=9?'Отлично, готовность экзаменационная.':qScore>=7?'Хорошо, добейте слабые слова в режиме «Учить».':'Вернитесь к карточкам — рано тестироваться.'}</p>
+      <button class="primary-btn" onclick="startQuiz()">Ещё раз</button>
+    </div>`;
+    return;
+  }
+  const q=quiz[qIdx];
+  const prompt = qDir==='en-ru'? q.w.en : q.w.ru;
+  v.innerHTML=`
+    <div class="quiz-progress">Вопрос ${qIdx+1} из ${quiz.length} · верно: ${qScore}</div>
+    <div class="quiz-q">
+      <div class="dirlabel">${qDir==='en-ru'?'переведите на русский':'переведите на английский'}</div>
+      <div class="word" style="font-size:${wsize(prompt,prompt.length>20)}">${prompt}</div>
+    </div>
+    <div class="opts">
+      ${q.opts.map((o,k)=>`<button id="opt${k}" onclick="pick(${k})">${qDir==='en-ru'?o.ru:o.en}</button>`).join('')}
+    </div>`;
+  qLocked=false;
+}
+function pick(k){
+  if(qLocked)return; qLocked=true;
+  const q=quiz[qIdx];
+  const correctIdx=q.opts.findIndex(o=>o.i===q.w.i);
+  const ok = k===correctIdx;
+  if(ok){qScore++; boxes[q.w.i]=Math.min(3,boxes[q.w.i]+0);}
+  else {boxes[q.w.i]=Math.max(0,boxes[q.w.i]-1); saveState();}
+  document.getElementById('opt'+correctIdx).classList.add('correct');
+  if(!ok) document.getElementById('opt'+k).classList.add('wrong');
+  setTimeout(()=>{qIdx++;renderQuestion();}, ok?600:1400);
+}
+
+/* ===== Список ===== */
+function renderList(){
+  const v=document.getElementById('view-list');
+  let html=progressHTML();
+  for(const [k,g] of Object.entries(GROUPS)){
+    const items=WORDS.map((w,i)=>({...w,i})).filter(w=>w.g===k);
+    html+=`<div class="group-block">
+      <div class="group-head"><span class="dot" style="border-color:${g.color}"></span>${g.name} · ${items.length}</div>
+      ${items.map(w=>`<div class="wordrow ${boxes[w.i]===3?'learned':''}">
+        <span class="en">${w.en}</span><span class="ru">${w.ru}</span>
+      </div>`).join('')}
+    </div>`;
+  }
+  v.innerHTML=html;
+}
+
+/* ===== init ===== */
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+loadState();
+if(!storageOK){ setTimeout(()=>toast('Хранилище недоступно: прогресс не сохранится'),600); }
+renderLearn();
+</script>
+</body>
+</html>
