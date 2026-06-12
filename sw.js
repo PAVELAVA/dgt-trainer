@@ -1,4 +1,4 @@
-const CACHE = 'dgt-trainer-v1';
+const CACHE = 'dgt-trainer-v2';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-180.png', './icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
