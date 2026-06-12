@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#23272b">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>DGT · Тренажёр (офлайн)</title>
+<style>
+  :root{
+    --asphalt:#23272b;
+    --line:#e3e6e9;
+    --paper:#f7f8f9;
+    --blue:#0a4ea3;      /* предписывающий знак */
+    --red:#c8102e;       /* запрещающий знак */
+    --green:#1c7c43;     /* указательный (автомагистраль ES) */
+    --amber:#e2a400;
+    --ink:#1b1f23;
+    --muted:#6b7480;
+    --radius:14px;
+    font-size:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+  html{height:100%}
+  body{
+    font-family:-apple-system,'Segoe UI',Roboto,sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    height:100vh;height:100dvh;
+    overflow:hidden;position:fixed;inset:0;width:100%;
+    display:flex;flex-direction:column;
+  }
+  header{
+    background:var(--asphalt);
+    color:#fff;
+    padding:calc(14px + env(safe-area-inset-top)) 16px 12px;
+  }
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand .sign{
+    width:34px;height:34px;border-radius:50%;
+    background:var(--blue);border:3px solid #fff;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:15px;color:#fff;
+    flex-shrink:0;
+  }
+  .brand h1{font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:1.15rem;letter-spacing:.02em;text-transform:uppercase}
+  .brand small{display:block;font-family:-apple-system;font-weight:400;font-size:.72rem;color:#aab2bb;letter-spacing:.04em;text-transform:none}
+  /* дорожная разметка под шапкой */
+  .roadline{height:6px;background:var(--asphalt);position:relative}
+  .roadline::after{
+    content:"";position:absolute;left:0;right:0;top:50%;height:2px;transform:translateY(-50%);
+    background:repeating-linear-gradient(90deg,#fff 0 26px,transparent 26px 44px);
+  }
+  nav{
+    display:flex;background:#fff;border-bottom:1px solid var(--line);
+    flex-shrink:0;
+  }
+  nav button{
+    flex:1;padding:12px 4px;border:0;background:none;cursor:pointer;
+    font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:600;font-size:.95rem;
+    text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+    border-bottom:3px solid transparent;
+  }
+  nav button.active{color:var(--blue);border-bottom-color:var(--blue)}
+  main{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:16px;max-width:560px;width:100%;margin:0 auto}
+
+  /* ---- прогресс ---- */
+  .progress{margin-bottom:14px}
+  .bigstat{font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:1.25rem;margin-bottom:6px;letter-spacing:.02em}
+  .bigstat b{color:var(--green)}
+  .reset-link.armed{color:#fff !important;background:var(--red);padding:6px 12px;border-radius:8px}
+  .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--asphalt);color:#fff;padding:11px 20px;border-radius:10px;font-size:.88rem;z-index:99;box-shadow:0 6px 18px rgba(0,0,0,.35);white-space:nowrap}
+  .progress .bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden;display:flex}
+  .progress .seg{height:100%}
+  .progress .labels{display:flex;justify-content:space-between;font-size:.72rem;color:var(--muted);margin-top:5px}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:.72rem;color:var(--muted);margin-top:4px}
+  .reset-link{display:block;margin:8px 0 0 auto;background:none;border:0;color:var(--red);font-size:.74rem;font-weight:700;cursor:pointer;padding:4px 0;text-transform:uppercase;letter-spacing:.04em}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+
+  /* ---- карточка ---- */
+  .card-zone{perspective:1200px}
+  .flashcard{
+    position:relative;width:100%;height:300px;cursor:pointer;
+    transform-style:preserve-3d;-webkit-transform-style:preserve-3d;
+    transition:transform .45s cubic-bezier(.4,.1,.2,1);
+  }
+  .flashcard.flipped{transform:rotateY(180deg)}
+  .face{
+    position:absolute;inset:0;overflow:hidden;
+    backface-visibility:hidden;-webkit-backface-visibility:hidden;
+    background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:0 4px 14px rgba(20,30,40,.07);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:20px 22px;text-align:center;
+  }
+  .face.back{transform:rotateY(180deg);background:var(--asphalt);color:#fff;border-color:var(--asphalt)}
+  .word{font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:2rem;line-height:1.1}
+  .face.back .word{font-size:1.7rem}
+  .grouptag{
+    font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;font-weight:700;
+    padding:3px 10px;border-radius:20px;margin-bottom:14px;
+  }
+  .hintline{font-size:.85rem;color:var(--muted);margin-top:12px;font-style:italic}
+  .face.back .hintline{color:#aab2bb}
+  .taphint{position:absolute;bottom:10px;left:0;right:0;font-size:.7rem;color:#b6bcc4;text-transform:uppercase;letter-spacing:.08em}
+  .boxbadge{position:absolute;top:10px;right:12px;font-size:.68rem;color:#b6bcc4;font-weight:600}
+
+  .answers{display:flex;gap:10px;margin-top:14px}
+  .answers button{
+    flex:1;padding:15px 0;border:0;border-radius:var(--radius);cursor:pointer;
+    font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:1.05rem;
+    text-transform:uppercase;letter-spacing:.04em;color:#fff;
+  }
+  .btn-no{background:var(--red)}
+  .btn-yes{background:var(--green)}
+  .answers button:disabled{opacity:.35;cursor:default}
+  .session-info{font-size:.8rem;color:var(--muted);text-align:center;margin-top:12px}
+  .done-banner{
+    background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+    padding:32px 20px;text-align:center;
+  }
+  .done-banner .sign-ok{
+    width:64px;height:64px;border-radius:50%;background:var(--blue);
+    margin:0 auto 14px;display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:1.8rem;border:4px solid #cdd9ea;
+  }
+  .done-banner h2{font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-size:1.3rem;margin-bottom:6px}
+  .done-banner p{font-size:.9rem;color:var(--muted)}
+  .primary-btn{
+    margin-top:16px;padding:13px 26px;border:0;border-radius:var(--radius);
+    background:var(--blue);color:#fff;cursor:pointer;
+    font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:1rem;
+    text-transform:uppercase;letter-spacing:.04em;
+  }
+  .ghost-btn{
+    margin-top:10px;padding:10px 22px;border:1px solid var(--line);border-radius:var(--radius);
+    background:#fff;color:var(--muted);cursor:pointer;font-size:.85rem;
+  }
+  .filter-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:10px;scrollbar-width:none}
+  .filter-row::-webkit-scrollbar{display:none}
+  .chip{
+    flex-shrink:0;padding:7px 13px;border-radius:20px;border:1px solid var(--line);
+    background:#fff;font-size:.78rem;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;
+  }
+  .chip.active{background:var(--asphalt);color:#fff;border-color:var(--asphalt)}
+
+  /* ---- тест ---- */
+  .quiz-q{
+    background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+    padding:22px 18px;text-align:center;margin-bottom:14px;
+  }
+  .quiz-q .word{font-size:1.6rem}
+  .quiz-q .dirlabel{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px}
+  .opts{display:flex;flex-direction:column;gap:9px}
+  .opts button{
+    padding:14px 16px;border:1px solid var(--line);border-radius:var(--radius);
+    background:#fff;font-size:1rem;font-weight:600;cursor:pointer;text-align:left;color:var(--ink);
+  }
+  .opts button.correct{background:#e6f3ea;border-color:var(--green);color:var(--green)}
+  .opts button.wrong{background:#fbe9ec;border-color:var(--red);color:var(--red)}
+  .quiz-progress{font-size:.8rem;color:var(--muted);text-align:center;margin-bottom:10px}
+  .quiz-result{text-align:center;padding:30px 16px;background:#fff;border:1px solid var(--line);border-radius:var(--radius)}
+  .quiz-result .score{font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:3rem;color:var(--blue)}
+  .dir-toggle{display:flex;gap:8px;margin-bottom:12px}
+  .dir-toggle button{
+    flex:1;padding:10px;border:1px solid var(--line);border-radius:var(--radius);
+    background:#fff;font-size:.85rem;font-weight:600;color:var(--muted);cursor:pointer;
+  }
+  .dir-toggle button.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+  /* ---- список ---- */
+  .group-block{margin-bottom:18px}
+  .group-head{
+    display:flex;align-items:center;gap:8px;margin-bottom:8px;
+    font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:1rem;text-transform:uppercase;letter-spacing:.04em;
+  }
+  .group-head .dot{width:12px;height:12px;border-radius:50%;border:2.5px solid;flex-shrink:0}
+  .wordrow{
+    display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+    background:#fff;border:1px solid var(--line);border-radius:10px;
+    padding:9px 13px;margin-bottom:6px;font-size:.92rem;
+  }
+  .wordrow .en{font-weight:700}
+  .wordrow .ru{color:var(--muted);text-align:right}
+  .wordrow.learned .en::after{content:" ✓";color:var(--green)}
+  footer{font-size:.7rem;color:#b6bcc4;text-align:center;padding:14px 16px calc(22px + env(safe-area-inset-bottom))}
+  @media(prefers-reduced-motion:reduce){.flashcard{transition:none}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="sign">EN</div>
+    <h1>DGT · Словарный тренажёр<small>≈100 слов экзаменационной лексики · система Лейтнера</small></h1>
+  </div>
+</header>
+<div class="roadline"></div>
+<nav>
+  <button id="tab-learn" class="active" onclick="showTab('learn')">Учить</button>
+  <button id="tab-quiz" onclick="showTab('quiz')">Тест</button>
+  <button id="tab-list" onclick="showTab('list')">Слова</button>
+</nav>
+<main>
+  <div id="view-learn"></div>
+  <div id="view-quiz" style="display:none"></div>
+  <div id="view-list" style="display:none"></div>
+</main>
+<footer>Автономная версия: работает без интернета, прогресс хранится на устройстве. Коробка 3 = выучено.</footer>
+
+<script>
+/* ===== Данные ===== */
+const GROUPS = {
+  rules:   {name:'Правила и предписания', color:'#0a4ea3'},
+  vehicle: {name:'ТС, шины и груз',       color:'#c8102e'},
+  road:    {name:'Дорога и обстановка',   color:'#1c7c43'},
+  driver:  {name:'Состояние водителя',    color:'#e2a400'},
+  actions: {name:'Действия и события',    color:'#6b4fa0'},
+  degree:  {name:'Количество и степень',  color:'#0e7c86'},
+  qual:    {name:'Оценка и связки',       color:'#7a5c3e'}
+};
+const WORDS = [
+ // Правила
+ {en:'Mandatory',ru:'обязательный',h:'МАНДАТ — у кого мандат, тому обязательно',g:'rules'},
+ {en:'Forbidden',ru:'запрещено',h:'запретный плод (forbidden fruit)',g:'rules'},
+ {en:'Allowed',ru:'разрешено',h:'«Алло!» — дозвонился, доступ разрешён',g:'rules'},
+ {en:'Advisable',ru:'целесообразно, рекомендуется',h:'адвокат советует (advice = совет)',g:'rules'},
+ {en:'Should',ru:'следует',h:'звучит как «шёл бы» — следует пойти',g:'rules'},
+ {en:'Are exempt',ru:'освобождены (от обязанности)',h:'экземпляр изъят из правила',g:'rules'},
+ {en:'Except when',ru:'кроме случаев, когда',h:'экс- = «вне»: экс-чемпион — вне списка',g:'rules'},
+ {en:'According to',ru:'согласно',h:'аккорд — ноты звучат согласно',g:'rules'},
+ {en:'Rule',ru:'правило',h:'кто за рулём — задаёт правила',g:'rules'},
+ {en:'Law',ru:'закон',h:'«лоер» (lawyer) — юрист знает закон',g:'rules'},
+ {en:'Right of way',ru:'преимущество, право проезда',h:'right = право, way = путь',g:'rules'},
+ {en:'Give way',ru:'уступить дорогу',h:'дословно «дай путь»',g:'rules'},
+ {en:'Purpose',ru:'цель, назначение',h:'«прёт пёс» к цели',g:'rules'},
+ {en:'Signposted',ru:'обозначено знаками',h:'sign = знак + post = столб',g:'rules'},
+ {en:'Considered',ru:'считается',h:'консилиум счёл',g:'rules'},
+ // ТС и груз
+ {en:'Vehicle',ru:'транспортное средство (любое)',h:'«вези, акула!» — всё, что везёт',g:'vehicle'},
+ {en:'Goods',ru:'груз, товары',h:'«гуд» = годный товар; goods vehicle = грузовое ТС',g:'vehicle'},
+ {en:'Car',ru:'легковой автомобиль',h:'карета → легковушка',g:'vehicle'},
+ {en:'Carry',ru:'перевозить, везти',h:'карри везут в карете',g:'vehicle'},
+ {en:'Protruding',ru:'выступающий (груз)',h:'ТРУба торчит из кузова',g:'vehicle'},
+ {en:'Height',ru:'высота',h:'«хай!» — машут сверху, с высоты',g:'vehicle'},
+ {en:'Restraint',ru:'удерживающее устройство',h:'ремень-стрейч удержал; child restraint — детское кресло',g:'vehicle'},
+ {en:'Fog light',ru:'противотуманная фара',h:'fog = туман: свет сквозь мглу',g:'vehicle'},
+ {en:'Audible',ru:'звуковой, слышимый',h:'аудио — то, что слышно',g:'vehicle'},
+ {en:'Immobilised',ru:'обездвиженное (ТС)',h:'иммобилайзер обездвиживает машину',g:'vehicle'},
+ {en:'Puncture',ru:'прокол шины',h:'пункция — медицинский прокол',g:'vehicle'},
+ {en:'Wear',ru:'износ',h:'веер истёрся от носки (wear = носить)',g:'vehicle'},
+ {en:'Unevenly',ru:'неравномерно',h:'un + even: «не-ровен»',g:'vehicle'},
+ {en:'Pattern',ru:'рисунок (протектора)',h:'паттерн — узор; tread pattern',g:'vehicle'},
+ {en:'Adjust',ru:'отрегулировать, настроить',h:'just = «как раз»: подогнать как раз',g:'vehicle'},
+ // Дорога
+ {en:'Surface',ru:'покрытие, поверхность',h:'сёрфер скользит по поверхности',g:'road'},
+ {en:'Paved road',ru:'дорога с твёрдым покрытием',h:'паве́ — «мостовая» из камней',g:'road'},
+ {en:'Interurban',ru:'загородная (дорога)',h:'интер + урбан = между городами',g:'road'},
+ {en:'Through-roads',ru:'транзитные, сквозные дороги',h:'through = сквозь: труба насквозь',g:'road'},
+ {en:'Narrows',ru:'сужается',h:'дорога сужается в НОРу',g:'road'},
+ {en:'Row',ru:'ряд',h:'гребцы в лодке сидят в ряд (row = грести)',g:'road'},
+ {en:'Areas',ru:'зоны, участки',h:'ареал обитания — зона',g:'road'},
+ {en:'Blind spot',ru:'слепая зона',h:'блайнд в покере — вслепую; spot = точка',g:'road'},
+ {en:'Approach',ru:'приближаться; подъезд',h:'«по обочине подкатывает»',g:'road'},
+ {en:'Environmental conditions',ru:'внешние / погодные условия',h:'эко-environment — окружающая среда',g:'road'},
+ {en:'Stuck',ru:'застрявший',h:'СТАКан застрял в подстаканнике',g:'road'},
+ {en:'Moving',ru:'движущийся',h:'«сделай мув» — движение',g:'road'},
+ {en:'Around',ru:'вокруг',h:'РАУНД — круг → вокруг',g:'road'},
+ {en:'Separate',ru:'отдельный; разделять',h:'сепаратор отделяет сливки',g:'road'},
+ // Водитель
+ {en:'Fatigue',ru:'усталость',h:'ФАТА тяжела — невеста устала',g:'driver'},
+ {en:'Tired',ru:'уставший',h:'tyre = шина: стёрся, как шина',g:'driver'},
+ {en:'Illness',ru:'болезнь',h:'ill: больной лежит в ИЛе на дне',g:'driver'},
+ {en:'Influence',ru:'влияние',h:'инфлюенсер влияет; under the influence — опьянение',g:'driver'},
+ {en:'Distract',ru:'отвлекать',h:'ТРАКТор отвлёк с тракта',g:'driver'},
+ {en:'Distraction',ru:'отвлечение внимания',h:'тот же трактор — само отвлечение',g:'driver'},
+ {en:'Impairment',ru:'ухудшение (функций)',h:'зрение исПАРилось — им-ПАР-мент',g:'driver'},
+ {en:'Delayed',ru:'замедленный, задержанный',h:'ДЕЛЭЙ — эффект задержки звука',g:'driver'},
+ {en:'Ability',ru:'способность',h:'able = способный: Абель был способный',g:'driver'},
+ {en:'Behavior',ru:'поведение',h:'бихевиоризм — наука о поведении',g:'driver'},
+ {en:'Accompanied',ru:'в сопровождении',h:'аккомпанемент — сопровождение',g:'driver'},
+ // Действия
+ {en:'Cause / Causes',ru:'причина; вызывать',h:'юр. «кауза», казус — причина дела',g:'actions'},
+ {en:'Occur',ru:'происходить, случаться',h:'о-КУРьёз — курьёз произошёл',g:'actions'},
+ {en:'Happens',ru:'происходит',h:'хэппенинг — событие происходит',g:'actions'},
+ {en:'Exist',ru:'существовать',h:'экзистенциализм — философия существования',g:'actions'},
+ {en:'Lose',ru:'терять',h:'ЛУЗЕР — вечно теряет',g:'actions'},
+ {en:'Avoid',ru:'избегать',h:'void = пустота: обойди пустоту',g:'actions'},
+ {en:'Warn / Warns',ru:'предупреждать',h:'ВОРОН каркает — предупреждает',g:'actions'},
+ {en:'Hinder traffic',ru:'мешать движению',h:'ХИтрый встал поперёк — мешает',g:'actions'},
+ {en:'Facilitate',ru:'облегчать, способствовать',h:'фасилитатор облегчает работу группы',g:'actions'},
+ {en:'Reduce / Reduced',ru:'снижать / сниженный',h:'РЕДУКТОР снижает обороты',g:'actions'},
+ {en:'Decreases',ru:'уменьшается',h:'ДЕ-крещендо — музыка затихает',g:'actions'},
+ {en:'Increases',ru:'увеличивается',h:'крещендо — нарастает',g:'actions'},
+ {en:'Use',ru:'использовать',h:'«юзать»',g:'actions'},
+ {en:'Event',ru:'случай',h:'ИВЕНТ; in the event of — в случае',g:'actions'},
+ // Степень
+ {en:'Excessive',ru:'чрезмерный',h:'ЭКСЦЕСС — чрезмерность, перебор',g:'degree'},
+ {en:'Sufficient',ru:'достаточный',h:'СУФФИКСа достаточно, чтобы изменить слово',g:'degree'},
+ {en:'Insufficient',ru:'недостаточный',h:'ин- = «не» + sufficient',g:'degree'},
+ {en:'Lack',ru:'недостаток, нехватка',h:'ЛАКУНА — пробел, нехватка',g:'degree'},
+ {en:'Less',ru:'меньше (неисчисляемое)',h:'ЛЕСенка вниз — всё меньше',g:'degree'},
+ {en:'Fewer',ru:'меньше (исчисляемое)',h:'«фью!» — сдул несколько штук',g:'degree'},
+ {en:'Least',ru:'наименьший',h:'последний ЛИСТ — наименьшее; at least — минимум',g:'degree'},
+ {en:'Above',ru:'выше, над',h:'буква А — наверху алфавита',g:'degree'},
+ {en:'Below',ru:'ниже, под',h:'be + LOW (лоу-кост) — низко',g:'degree'},
+ {en:'Under',ru:'под; менее',h:'АНДЕГРАУНД — под землёй',g:'degree'},
+ {en:'Same',ru:'тот же, одинаковый',h:'СИАМские близнецы — одинаковые',g:'degree'},
+ {en:'Even',ru:'даже',h:'«Иван ровный — даже он» (even = ровный)',g:'degree'},
+ {en:'Even if they',ru:'даже если они',h:'even + if = даже если',g:'degree'},
+ {en:'Regardless',ru:'независимо от',h:'regard = взгляд: «не глядя», невзирая',g:'degree'},
+ // Оценка и связки
+ {en:'Main',ru:'основной, главный',h:'МЕЙНстрим — главное течение',g:'qual'},
+ {en:'Essential',ru:'важнейший, необходимый',h:'ЭССЕНЦИЯ — сама суть',g:'qual'},
+ {en:'Necessary',ru:'необходимо',h:'НЕСЕССЕР — набор необходимого',g:'qual'},
+ {en:'Additional',ru:'дополнительный',h:'АДДОН — дополнение',g:'qual'},
+ {en:'Exceptional',ru:'исключительный',h:'exception в коде — исключение',g:'qual'},
+ {en:'Appropriate',ru:'подходящий, надлежащий',h:'«а, про-приятный» — приятно подходит',g:'qual'},
+ {en:'Inappropriate',ru:'неподходящий',h:'«не-приятный» — не подходит',g:'qual'},
+ {en:'Better',ru:'лучше',h:'«БАТЯ лучше знает»',g:'qual'},
+ {en:'Chosen',ru:'выбранный',h:'The Chosen One — Избранный (Нео)',g:'qual'},
+ {en:'Currently',ru:'в настоящее время',h:'current = ток — течёт прямо сейчас',g:'qual'},
+ {en:'Quickly',ru:'быстро',h:'КВИКстеп — быстрый танец',g:'qual'},
+ {en:'Often',ru:'часто',h:'«в ОФис хожу часто»',g:'qual'},
+ {en:'While',ru:'пока; тогда как',h:'«пока ВАрится — жди»',g:'qual'},
+ {en:'Following',ru:'следующий',h:'ФОЛЛОВЕРЫ следуют за тобой',g:'qual'},
+ {en:'These',ru:'эти',h:'«зэ-ЭТИ» — почти совпадает по звуку',g:'qual'},
+ {en:'Safety',ru:'безопасность',h:'СЕЙФ — там безопасно',g:'qual'},
+ {en:'Insect',ru:'насекомое',h:'ИНСЕКТИЦИД — средство от насекомых',g:'qual'}
+];
+
+/* ===== Состояние (Лейтнер: 0–3) ===== */
+let boxes = WORDS.map(()=>0);
+const STORE_KEY = 'dgt-words-offline-v1';
+let storageOK = true;
+
+function loadState(){
+  try{
+    const r = localStorage.getItem(STORE_KEY);
+    if(r){
+      const s = JSON.parse(r);
+      if(Array.isArray(s.boxes) && s.boxes.length===WORDS.length) boxes = s.boxes;
+      if(s.filter) filterGroup = s.filter;
+      if(s.dir) qDir = s.dir;
+    }
+  }catch(e){ storageOK = false; }
+}
+function saveState(){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify({boxes, filter:filterGroup, dir:qDir, ts:Date.now()})); }
+  catch(e){ storageOK = false; }
+}
+/* страховка: сохраняем при сворачивании/закрытии */
+window.addEventListener('pagehide', saveState);
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveState(); });
+
+/* ===== Навигация ===== */
+function showTab(t){
+  currentTab=t;
+  ['learn','quiz','list'].forEach(x=>{
+    document.getElementById('view-'+x).style.display = (x===t)?'':'none';
+    document.getElementById('tab-'+x).classList.toggle('active',x===t);
+  });
+  if(t==='learn') renderLearn();
+  if(t==='quiz') renderQuizStart();
+  if(t==='list') renderList();
+}
+
+/* ===== Прогресс ===== */
+function progressHTML(){
+  const c=[0,0,0,0];
+  boxes.forEach(b=>c[b]++);
+  const n=WORDS.length;
+  const cols=['#d4d9de','#e2a400','#5a9bd4','#1c7c43'];
+  let segs='';
+  for(let i=0;i<4;i++) segs+=`<div class="seg" style="width:${(c[i]/n*100)}%;background:${cols[i]}"></div>`;
+  return `<div class="progress">
+    <div class="bigstat">Выучено <b>${c[3]}</b> из ${n} · ${Math.round(c[3]/n*100)}%</div>
+    <div class="bar">${segs}</div>
+    <div class="legend">
+      <span><i style="background:${cols[0]}"></i>новые ${c[0]}</span>
+      <span><i style="background:${cols[1]}"></i>коробка 1: ${c[1]}</span>
+      <span><i style="background:${cols[2]}"></i>коробка 2: ${c[2]}</span>
+      <span><i style="background:${cols[3]}"></i>выучено ${c[3]}</span>
+    </div>
+    <button class="reset-link" onclick="resetProgress()">⟲ Сбросить прогресс</button>
+  </div>`;
+}
+
+/* размер шрифта слова: крупный, но ужимается для длинных фраз */
+function wsize(t,back){
+  const L=t.length;
+  if(!back){ if(L<=8)return'4rem'; if(L<=14)return'3.1rem'; if(L<=22)return'2.4rem'; return'1.9rem'; }
+  else     { if(L<=10)return'3.4rem'; if(L<=18)return'2.6rem'; if(L<=28)return'2rem'; return'1.7rem'; }
+}
+
+/* ===== Режим «Учить» ===== */
+let session=[], idx=0, flipped=false, filterGroup='all';
+
+function buildSession(){
+  let pool = WORDS.map((w,i)=>({...w,i}))
+    .filter(w=> filterGroup==='all' || w.g===filterGroup);
+  // приоритет младшим коробкам; выученные (3) показываем редко
+  pool.sort((a,b)=> boxes[a.i]-boxes[b.i] || Math.random()-0.5);
+  const active = pool.filter(w=>boxes[w.i]<3);
+  session = (active.length? active : pool).slice(0,20);
+  shuffle(session);
+  idx=0; flipped=false;
+}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}}
+
+function renderLearn(){
+  const v=document.getElementById('view-learn');
+  const chips = `<div class="filter-row">
+    <button class="chip ${filterGroup==='all'?'active':''}" onclick="setFilter('all')">Все группы</button>
+    ${Object.entries(GROUPS).map(([k,g])=>
+      `<button class="chip ${filterGroup===k?'active':''}" onclick="setFilter('${k}')">${g.name}</button>`).join('')}
+  </div>`;
+  if(!session.length || idx>=session.length){
+    buildSession();
+  }
+  const learned = boxes.filter(b=>b===3).length;
+  if(learned===WORDS.length && filterGroup==='all'){
+    v.innerHTML = progressHTML()+chips+`
+      <div class="done-banner">
+        <div class="sign-ok">✓</div>
+        <h2>Все слова выучены</h2>
+        <p>Прогоните режим «Тест» в обе стороны для закрепления.</p>
+        <button class="ghost-btn" onclick="resetProgress()">Сбросить прогресс</button>
+      </div>`;
+    return;
+  }
+  const w = session[idx];
+  const g = GROUPS[w.g];
+  v.innerHTML = progressHTML()+chips+`
+    <div class="card-zone">
+      <div class="flashcard ${flipped?'flipped':''}" id="fc" onclick="flipCard()">
+        <div class="face front">
+          <span class="boxbadge">коробка ${boxes[w.i]}</span>
+          <span class="grouptag" style="background:${g.color}1a;color:${g.color}">${g.name}</span>
+          <div class="word" style="font-size:${wsize(w.en,false)}">${w.en}</div>
+          <div class="taphint">нажмите, чтобы перевернуть</div>
+        </div>
+        <div class="face back">
+          <div class="word" style="font-size:${wsize(w.ru,true)}">${w.ru}</div>
+          <div class="hintline">${w.en}</div>
+        </div>
+      </div>
+    </div>
+    <div class="answers">
+      <button class="btn-no" onclick="answer(false)" ${flipped?'':'disabled'}>Не знаю</button>
+      <button class="btn-yes" onclick="answer(true)" ${flipped?'':'disabled'}>Знаю</button>
+    </div>
+    <div class="session-info">Карточка ${idx+1} из ${session.length} в сессии</div>`;
+}
+function setFilter(g){filterGroup=g;session=[];saveState();renderLearn();}
+function flipCard(){flipped=!flipped;
+  document.getElementById('fc').classList.toggle('flipped',flipped);
+  document.querySelectorAll('.answers button').forEach(b=>b.disabled=!flipped);
+}
+function answer(knew){
+  const w=session[idx];
+  if(knew) boxes[w.i]=Math.min(3,boxes[w.i]+1);
+  else { boxes[w.i]=Math.max(0,boxes[w.i]-1);
+         session.push(w); } // вернётся в конец сессии
+  saveState();
+  idx++; flipped=false;
+  if(idx>=session.length){ buildSession(); }
+  renderLearn();
+}
+let resetArmed=false, resetTimer=null, currentTab='learn';
+function toast(msg){
+  const t=document.createElement('div');t.className='toast';t.textContent=msg;
+  document.body.appendChild(t);setTimeout(()=>t.remove(),2600);
+}
+function resetProgress(){
+  if(!resetArmed){
+    resetArmed=true;
+    document.querySelectorAll('.reset-link').forEach(b=>{
+      b.textContent='Точно сбросить? Нажмите ещё раз';b.classList.add('armed');
+    });
+    resetTimer=setTimeout(()=>{resetArmed=false;showTab(currentTab);},4000);
+    return;
+  }
+  clearTimeout(resetTimer);resetArmed=false;
+  boxes=WORDS.map(()=>0); saveState(); session=[];
+  showTab('learn');
+  toast('Прогресс сброшен: все 100 слов снова новые');
+}
+
+/* ===== Режим «Тест» ===== */
+let quiz=[], qIdx=0, qScore=0, qDir='en-ru', qLocked=false;
+
+function renderQuizStart(){
+  const v=document.getElementById('view-quiz');
+  v.innerHTML = progressHTML()+`
+    <div class="dir-toggle">
+      <button class="${qDir==='en-ru'?'active':''}" onclick="setDir('en-ru')">EN → RU</button>
+      <button class="${qDir==='ru-en'?'active':''}" onclick="setDir('ru-en')">RU → EN</button>
+    </div>
+    <div class="done-banner">
+      <h2>Тест: 10 вопросов</h2>
+      <p>Случайные слова, 4 варианта ответа. Перед экзаменом цель — стабильно 9–10 из 10.</p>
+      <button class="primary-btn" onclick="startQuiz()">Начать тест</button>
+    </div>`;
+}
+function setDir(d){qDir=d;saveState();renderQuizStart();}
+function startQuiz(){
+  const pool=WORDS.map((w,i)=>({...w,i}));
+  shuffle(pool);
+  quiz=pool.slice(0,10).map(w=>{
+    const wrong=pool.filter(x=>x.i!==w.i);
+    shuffle(wrong);
+    const opts=[w,...wrong.slice(0,3)];
+    shuffle(opts);
+    return {w,opts};
+  });
+  qIdx=0;qScore=0;qLocked=false;
+  renderQuestion();
+}
+function renderQuestion(){
+  const v=document.getElementById('view-quiz');
+  if(qIdx>=quiz.length){
+    v.innerHTML=`<div class="quiz-result">
+      <div class="score">${qScore}/${quiz.length}</div>
+      <p style="color:var(--muted);margin-bottom:6px">${qScore>=9?'Отлично, готовность экзаменационная.':qScore>=7?'Хорошо, добейте слабые слова в режиме «Учить».':'Вернитесь к карточкам — рано тестироваться.'}</p>
+      <button class="primary-btn" onclick="startQuiz()">Ещё раз</button>
+    </div>`;
+    return;
+  }
+  const q=quiz[qIdx];
+  const prompt = qDir==='en-ru'? q.w.en : q.w.ru;
+  v.innerHTML=`
+    <div class="quiz-progress">Вопрос ${qIdx+1} из ${quiz.length} · верно: ${qScore}</div>
+    <div class="quiz-q">
+      <div class="dirlabel">${qDir==='en-ru'?'переведите на русский':'переведите на английский'}</div>
+      <div class="word" style="font-size:${wsize(prompt,prompt.length>20)}">${prompt}</div>
+    </div>
+    <div class="opts">
+      ${q.opts.map((o,k)=>`<button id="opt${k}" onclick="pick(${k})">${qDir==='en-ru'?o.ru:o.en}</button>`).join('')}
+    </div>`;
+  qLocked=false;
+}
+function pick(k){
+  if(qLocked)return; qLocked=true;
+  const q=quiz[qIdx];
+  const correctIdx=q.opts.findIndex(o=>o.i===q.w.i);
+  const ok = k===correctIdx;
+  if(ok){qScore++; boxes[q.w.i]=Math.min(3,boxes[q.w.i]+0);}
+  else {boxes[q.w.i]=Math.max(0,boxes[q.w.i]-1); saveState();}
+  document.getElementById('opt'+correctIdx).classList.add('correct');
+  if(!ok) document.getElementById('opt'+k).classList.add('wrong');
+  setTimeout(()=>{qIdx++;renderQuestion();}, ok?600:1400);
+}
+
+/* ===== Список ===== */
+function renderList(){
+  const v=document.getElementById('view-list');
+  let html=progressHTML();
+  for(const [k,g] of Object.entries(GROUPS)){
+    const items=WORDS.map((w,i)=>({...w,i})).filter(w=>w.g===k);
+    html+=`<div class="group-block">
+      <div class="group-head"><span class="dot" style="border-color:${g.color}"></span>${g.name} · ${items.length}</div>
+      ${items.map(w=>`<div class="wordrow ${boxes[w.i]===3?'learned':''}">
+        <span class="en">${w.en}</span><span class="ru">${w.ru}</span>
+      </div>`).join('')}
+    </div>`;
+  }
+  v.innerHTML=html;
+}
+
+/* ===== init ===== */
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+loadState();
+if(!storageOK){
+  document.querySelector('footer').textContent='Внимание: хранилище недоступно — прогресс не сохранится после закрытия. Откройте файл в приложении Documents.';
+}
+renderLearn();
+</script>
+</body>
+</html>
