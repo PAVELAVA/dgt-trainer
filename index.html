@@ -83,7 +83,7 @@
   /* ---- карточка ---- */
   .card-zone{perspective:1200px}
   .flashcard{
-    position:relative;width:100%;height:300px;cursor:pointer;
+    position:relative;width:100%;height:clamp(300px, calc(100dvh - 500px), 540px);cursor:pointer;
     transform-style:preserve-3d;-webkit-transform-style:preserve-3d;
     transition:transform .45s cubic-bezier(.4,.1,.2,1);
   }
@@ -208,7 +208,6 @@
   <div id="view-quiz" style="display:none"></div>
   <div id="view-list" style="display:none"></div>
 </main>
-<footer>Автономная версия: работает без интернета, прогресс хранится на устройстве. Коробка 3 = выучено.</footer>
 
 <script>
 /* ===== Данные ===== */
@@ -376,7 +375,7 @@ function progressHTML(){
   let segs='';
   for(let i=0;i<4;i++) segs+=`<div class="seg" style="width:${(c[i]/n*100)}%;background:${cols[i]}"></div>`;
   return `<div class="progress">
-    <div class="bigstat">Выучено <b>${c[3]}</b> из ${n} · ${Math.round(c[3]/n*100)}%</div>
+    <div class="bigstat">Прогресс <b>${Math.round(boxes.reduce((s,b)=>s+b,0)/(3*n)*100)}%</b> · выучено ${c[3]} из ${n}</div>
     <div class="bar">${segs}</div>
     <div class="legend">
       <span><i style="background:${cols[0]}"></i>новые ${c[0]}</span>
@@ -573,9 +572,7 @@ function renderList(){
 /* ===== init ===== */
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 loadState();
-if(!storageOK){
-  document.querySelector('footer').textContent='Внимание: хранилище недоступно — прогресс не сохранится после закрытия. Откройте файл в приложении Documents.';
-}
+if(!storageOK){ setTimeout(()=>toast('Хранилище недоступно: прогресс не сохранится'),600); }
 renderLearn();
 </script>
 </body>
