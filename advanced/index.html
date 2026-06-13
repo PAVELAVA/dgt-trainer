@@ -141,6 +141,13 @@
   }
   .filter-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:10px;scrollbar-width:none}
   .filter-row::-webkit-scrollbar{display:none}
+  .order-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:.84rem;color:var(--muted);margin-bottom:12px;font-weight:600}
+  .switch{position:relative;display:inline-block;width:46px;height:26px;flex-shrink:0}
+  .switch input{opacity:0;width:0;height:0}
+  .slider{position:absolute;inset:0;background:#c9ced4;border-radius:26px;transition:.2s;cursor:pointer}
+  .slider::before{content:"";position:absolute;height:20px;width:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+  .switch input:checked + .slider{background:var(--blue)}
+  .switch input:checked + .slider::before{transform:translateX(20px)}
   .chip{
     flex-shrink:0;padding:7px 13px;border-radius:20px;border:1px solid var(--line);
     background:#fff;font-size:.78rem;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;
@@ -549,11 +556,12 @@ function loadState(){
       if(Array.isArray(s.boxes) && s.boxes.length===WORDS.length) boxes = s.boxes;
       if(s.filter) filterGroup = s.filter;
       if(s.dir) qDir = s.dir;
+      if(typeof s.shuffle==='boolean') shuffleMode = s.shuffle;
     }
   }catch(e){ storageOK = false; }
 }
 function saveState(){
-  try{ localStorage.setItem(STORE_KEY, JSON.stringify({boxes, filter:filterGroup, dir:qDir, ts:Date.now()})); }
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify({boxes, filter:filterGroup, dir:qDir, shuffle:shuffleMode, ts:Date.now()})); }
   catch(e){ storageOK = false; }
 }
 /* страховка: сохраняем при сворачивании/закрытии */
@@ -573,23 +581,16 @@ function showTab(t){
 }
 
 /* ===== Прогресс ===== */
-function progressHTML(){
-  const c=[0,0,0,0];
-  boxes.forEach(b=>c[b]++);
-  const n=WORDS.length;
-  const cols=['#d4d9de','#e2a400','#5a9bd4','#1c7c43'];
-  let segs='';
-  for(let i=0;i<4;i++) segs+=`<div class="seg" style="width:${(c[i]/n*100)}%;background:${cols[i]}"></div>`;
+function progressHTML(scoped){
+  const pool = WORDS.map((w,i)=>({...w,i})).filter(w=> !scoped || filterGroup==='all' || w.g===filterGroup);
+  const n=pool.length;
+  const known = pool.filter(w=>boxes[w.i]===3).length;
+  const pct = n? Math.round(known/n*100):0;
+  const inGroup = scoped && filterGroup!=='all';
   return `<div class="progress">
-    <div class="bigstat">Прогресс <b>${Math.round(boxes.reduce((s,b)=>s+b,0)/(3*n)*100)}%</b> · выучено ${c[3]} из ${n}</div>
-    <div class="bar">${segs}</div>
-    <div class="legend">
-      <span><i style="background:${cols[0]}"></i>новые ${c[0]}</span>
-      <span><i style="background:${cols[1]}"></i>коробка 1: ${c[1]}</span>
-      <span><i style="background:${cols[2]}"></i>коробка 2: ${c[2]}</span>
-      <span><i style="background:${cols[3]}"></i>выучено ${c[3]}</span>
-    </div>
-    <button class="reset-link" onclick="resetProgress()">⟲ Сбросить прогресс</button>
+    <div class="bigstat">${inGroup?GROUPS[filterGroup].name+': ':'Прогресс '}<b>${pct}%</b> · выучено ${known} из ${n}</div>
+    <div class="bar"><div class="seg" style="width:${pct}%;background:#1c7c43"></div><div class="seg" style="width:${100-pct}%;background:#d4d9de"></div></div>
+    <button class="reset-link" onclick="resetProgress()">⟲ Сбросить ${inGroup?'эту группу':'весь прогресс'}</button>
   </div>`;
 }
 
@@ -601,16 +602,14 @@ function wsize(t,back){
 }
 
 /* ===== Режим «Учить» ===== */
-let session=[], idx=0, flipped=false, filterGroup='all';
+let session=[], idx=0, flipped=false, filterGroup='all', shuffleMode=true;
 
 function buildSession(){
   let pool = WORDS.map((w,i)=>({...w,i}))
     .filter(w=> filterGroup==='all' || w.g===filterGroup);
-  // приоритет младшим коробкам; выученные (3) показываем редко
-  pool.sort((a,b)=> boxes[a.i]-boxes[b.i] || Math.random()-0.5);
-  const active = pool.filter(w=>boxes[w.i]<3);
-  session = (active.length? active : pool).slice(0,20);
-  shuffle(session);
+  let active = pool.filter(w=>boxes[w.i]<3);   // невыученные, в исходном порядке
+  if(shuffleMode) shuffle(active);             // ползунок включён — перемешать
+  session = filterGroup==='all' ? active.slice(0,20) : active;
   idx=0; flipped=false;
 }
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}}
@@ -622,27 +621,26 @@ function renderLearn(){
     ${Object.entries(GROUPS).map(([k,g])=>
       `<button class="chip ${filterGroup===k?'active':''}" onclick="setFilter('${k}')">${g.name}</button>`).join('')}
   </div>`;
+  const toggle = `<div class="order-row"><span>Перемешивать слова</span>
+    <label class="switch"><input type="checkbox" ${shuffleMode?'checked':''} onchange="toggleShuffle(this.checked)"><span class="slider"></span></label></div>`;
   if(!session.length || idx>=session.length){
     buildSession();
   }
-  const learned = boxes.filter(b=>b===3).length;
-  if(learned===WORDS.length && filterGroup==='all'){
-    v.innerHTML = progressHTML()+chips+`
+  if(!session.length){
+    v.innerHTML = progressHTML(true)+chips+toggle+`
       <div class="done-banner">
         <div class="sign-ok">✓</div>
-        <h2>Все слова выучены</h2>
-        <p>Прогоните режим «Тест» в обе стороны для закрепления.</p>
-        <button class="ghost-btn" onclick="resetProgress()">Сбросить прогресс</button>
+        <h2>${filterGroup==='all'?'Все слова выучены':'Группа выучена'}</h2>
+        <p>${filterGroup==='all'?'Прогоните режим «Тест» для закрепления.':'Выберите другую группу или сбросьте эту кнопкой «Сбросить» выше.'}</p>
       </div>`;
     return;
   }
   const w = session[idx];
   const g = GROUPS[w.g];
-  v.innerHTML = progressHTML()+chips+`
+  v.innerHTML = progressHTML(true)+chips+toggle+`
     <div class="card-zone">
       <div class="flashcard ${flipped?'flipped':''}" id="fc" onclick="flipCard()">
         <div class="face front">
-          <span class="boxbadge">коробка ${boxes[w.i]}</span>
           <span class="grouptag" style="background:${g.color}1a;color:${g.color}">${g.name}</span>
           <div class="word" style="font-size:${wsize(w.en,false)}">${w.en}</div>
           <div class="taphint">нажмите, чтобы перевернуть</div>
@@ -660,15 +658,15 @@ function renderLearn(){
     <div class="session-info">Карточка ${idx+1} из ${session.length} в сессии</div>`;
 }
 function setFilter(g){filterGroup=g;session=[];saveState();renderLearn();}
+function toggleShuffle(on){shuffleMode=on;saveState();session=[];renderLearn();}
 function flipCard(){flipped=!flipped;
   document.getElementById('fc').classList.toggle('flipped',flipped);
   document.querySelectorAll('.answers button').forEach(b=>b.disabled=!flipped);
 }
 function answer(knew){
   const w=session[idx];
-  if(knew) boxes[w.i]=Math.min(3,boxes[w.i]+1);
-  else { boxes[w.i]=Math.max(0,boxes[w.i]-1);
-         session.push(w); } // вернётся в конец сессии
+  if(knew){ boxes[w.i]=3; }                 // «Знаю» — выучено, больше не появится
+  else { boxes[w.i]=0; session.push(w); }   // «Не знаю» — вернётся ещё раз
   saveState();
   idx++; flipped=false;
   if(idx>=session.length){ buildSession(); }
@@ -680,6 +678,7 @@ function toast(msg){
   document.body.appendChild(t);setTimeout(()=>t.remove(),2600);
 }
 function resetProgress(){
+  const scopeAll = filterGroup==='all';
   if(!resetArmed){
     resetArmed=true;
     document.querySelectorAll('.reset-link').forEach(b=>{
@@ -689,9 +688,12 @@ function resetProgress(){
     return;
   }
   clearTimeout(resetTimer);resetArmed=false;
-  boxes=WORDS.map(()=>0); saveState(); session=[];
+  let cnt=0;
+  WORDS.forEach((w,i)=>{ if(scopeAll||w.g===filterGroup){ boxes[i]=0; cnt++; } });
+  saveState(); session=[];
   showTab('learn');
-  toast('Прогресс сброшен: все 307 слов снова новые');
+  toast(scopeAll ? ('Сброшено: все '+cnt+' слов снова новые')
+                 : ('Сброшена группа «'+GROUPS[filterGroup].name+'»: '+cnt+' слов'));
 }
 
 /* ===== Режим «Тест» ===== */
