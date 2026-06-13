@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#23272b">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>DGT · Фразы (офлайн)</title>
+<style>
+  :root{
+    --asphalt:#23272b;
+    --line:#e3e6e9;
+    --paper:#f7f8f9;
+    --blue:#0a4ea3;
+    --red:#c8102e;
+    --green:#1c7c43;
+    --amber:#e2a400;
+    --ink:#1b1f23;
+    --muted:#6b7480;
+    --radius:14px;
+    font-size:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+  html{height:100%}
+  body{
+    font-family:-apple-system,'Segoe UI',Roboto,sans-serif;
+    background:var(--paper);color:var(--ink);
+    height:100vh;height:100dvh;
+    overflow:hidden;position:fixed;inset:0;width:100%;
+    display:flex;flex-direction:column;
+  }
+  header{background:var(--asphalt);color:#fff;padding:calc(14px + env(safe-area-inset-top)) 16px 12px}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand .sign{
+    width:34px;height:34px;border-radius:50%;
+    background:var(--green);border:3px solid #fff;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:13px;color:#fff;flex-shrink:0;
+  }
+  .brand h1{font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:1.12rem;letter-spacing:.02em;text-transform:uppercase}
+  .brand small{display:block;font-family:-apple-system;font-weight:400;font-size:.72rem;color:#aab2bb;letter-spacing:.04em;text-transform:none}
+  .roadline{height:6px;background:var(--asphalt);position:relative}
+  .roadline::after{content:"";position:absolute;left:0;right:0;top:50%;height:2px;transform:translateY(-50%);
+    background:repeating-linear-gradient(90deg,#fff 0 26px,transparent 26px 44px)}
+  nav{display:flex;background:#fff;border-bottom:1px solid var(--line);flex-shrink:0}
+  nav button{flex:1;padding:12px 4px;border:0;background:none;cursor:pointer;
+    font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:600;font-size:.95rem;
+    text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border-bottom:3px solid transparent}
+  nav button.active{color:var(--green);border-bottom-color:var(--green)}
+  main{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:16px;max-width:560px;width:100%;margin:0 auto}
+
+  /* переключатель типа контента */
+  .typeswitch{display:flex;gap:8px;margin-bottom:14px}
+  .typeswitch button{flex:1;padding:11px 6px;border:1px solid var(--line);border-radius:var(--radius);
+    background:#fff;font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:.92rem;
+    text-transform:uppercase;letter-spacing:.03em;color:var(--muted);cursor:pointer;line-height:1.2}
+  .typeswitch button.active{background:var(--green);color:#fff;border-color:var(--green)}
+
+  /* прогресс */
+  .progress{margin-bottom:14px}
+  .bigstat{font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:1.2rem;margin-bottom:6px;letter-spacing:.02em}
+  .bigstat b{color:var(--green)}
+  .reset-link.armed{color:#fff !important;background:var(--red);padding:6px 12px;border-radius:8px}
+  .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--asphalt);color:#fff;padding:11px 20px;border-radius:10px;font-size:.86rem;z-index:99;box-shadow:0 6px 18px rgba(0,0,0,.35);max-width:90%;text-align:center}
+  .progress .bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden;display:flex}
+  .progress .seg{height:100%}
+  .reset-link{display:block;margin:8px 0 0 auto;background:none;border:0;color:var(--red);font-size:.74rem;font-weight:700;cursor:pointer;padding:4px 0;text-transform:uppercase;letter-spacing:.04em}
+
+  /* карточка */
+  .card-zone{perspective:1200px}
+  .flashcard{position:relative;width:100%;height:clamp(300px, calc(100dvh - 540px), 560px);cursor:pointer;
+    transform-style:preserve-3d;-webkit-transform-style:preserve-3d;transition:transform .45s cubic-bezier(.4,.1,.2,1)}
+  .flashcard.flipped{transform:rotateY(180deg)}
+  .face{position:absolute;inset:0;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+    background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 4px 14px rgba(20,30,40,.07);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;padding:22px 22px;text-align:center}
+  .face.back{transform:rotateY(180deg);background:var(--asphalt);color:#fff;border-color:var(--asphalt)}
+  .word{font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;line-height:1.18}
+  .grouptag{font-size:.66rem;text-transform:uppercase;letter-spacing:.07em;font-weight:700;padding:3px 10px;border-radius:20px;margin-bottom:16px}
+  .hintline{font-size:.82rem;color:var(--muted);margin-top:14px;font-style:italic;line-height:1.4}
+  .face.back .hintline{color:#aeb6bf}
+  .taphint{position:absolute;bottom:10px;left:0;right:0;font-size:.7rem;color:#b6bcc4;text-transform:uppercase;letter-spacing:.08em}
+
+  .answers{display:flex;gap:10px;margin-top:14px}
+  .answers button{flex:1;padding:15px 0;border:0;border-radius:var(--radius);cursor:pointer;
+    font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:1.05rem;
+    text-transform:uppercase;letter-spacing:.04em;color:#fff}
+  .btn-no{background:var(--red)}
+  .btn-yes{background:var(--green)}
+  .answers button:disabled{opacity:.35;cursor:default}
+  .session-info{font-size:.8rem;color:var(--muted);text-align:center;margin-top:12px}
+  .done-banner{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:32px 20px;text-align:center}
+  .done-banner .sign-ok{width:64px;height:64px;border-radius:50%;background:var(--green);margin:0 auto 14px;
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.8rem;border:4px solid #c5ddcd}
+  .done-banner h2{font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-size:1.3rem;margin-bottom:6px}
+  .done-banner p{font-size:.9rem;color:var(--muted)}
+  .primary-btn{margin-top:16px;padding:13px 26px;border:0;border-radius:var(--radius);background:var(--green);color:#fff;cursor:pointer;
+    font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:1rem;text-transform:uppercase;letter-spacing:.04em}
+  .filter-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:10px;scrollbar-width:none}
+  .filter-row::-webkit-scrollbar{display:none}
+  .order-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:.84rem;color:var(--muted);margin-bottom:12px;font-weight:600}
+  .switch{position:relative;display:inline-block;width:46px;height:26px;flex-shrink:0}
+  .switch input{opacity:0;width:0;height:0}
+  .slider{position:absolute;inset:0;background:#c9ced4;border-radius:26px;transition:.2s;cursor:pointer}
+  .slider::before{content:"";position:absolute;height:20px;width:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+  .switch input:checked + .slider{background:var(--green)}
+  .switch input:checked + .slider::before{transform:translateX(20px)}
+  .chip{flex-shrink:0;padding:7px 13px;border-radius:20px;border:1px solid var(--line);background:#fff;font-size:.78rem;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap}
+  .chip.active{background:var(--asphalt);color:#fff;border-color:var(--asphalt)}
+
+  /* тест */
+  .quiz-q{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:22px 18px;text-align:center;margin-bottom:14px}
+  .quiz-q .dirlabel{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px}
+  .opts{display:flex;flex-direction:column;gap:9px}
+  .opts button{padding:14px 16px;border:1px solid var(--line);border-radius:var(--radius);background:#fff;font-size:.96rem;font-weight:600;cursor:pointer;text-align:left;color:var(--ink);line-height:1.35}
+  .opts button.correct{background:#e6f3ea;border-color:var(--green);color:var(--green)}
+  .opts button.wrong{background:#fbe9ec;border-color:var(--red);color:var(--red)}
+  .quiz-progress{font-size:.8rem;color:var(--muted);text-align:center;margin-bottom:10px}
+  .quiz-result{text-align:center;padding:30px 16px;background:#fff;border:1px solid var(--line);border-radius:var(--radius)}
+  .quiz-result .score{font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:3rem;color:var(--green)}
+  .dir-toggle{display:flex;gap:8px;margin-bottom:12px}
+  .dir-toggle button{flex:1;padding:10px;border:1px solid var(--line);border-radius:var(--radius);background:#fff;font-size:.85rem;font-weight:600;color:var(--muted);cursor:pointer}
+  .dir-toggle button.active{background:var(--green);color:#fff;border-color:var(--green)}
+
+  /* список */
+  .group-block{margin-bottom:18px}
+  .group-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;
+    font-family:'Avenir Next Condensed','Arial Narrow',system-ui;font-weight:700;font-size:1rem;text-transform:uppercase;letter-spacing:.04em}
+  .group-head .dot{width:12px;height:12px;border-radius:50%;border:2.5px solid;flex-shrink:0}
+  .phraserow{background:#fff;border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:7px}
+  .phraserow .en{font-weight:700;font-size:.95rem;display:block}
+  .phraserow .ru{color:var(--muted);font-size:.88rem;display:block;margin-top:3px}
+  .phraserow .hh{color:#9aa2ac;font-size:.78rem;display:block;margin-top:5px;font-style:italic}
+  .phraserow.learned{border-color:var(--green);background:#f3faf5}
+  .phraserow.learned .en::after{content:" ✓";color:var(--green)}
+  footer{font-size:.7rem;color:#b6bcc4;text-align:center;padding:14px 16px calc(22px + env(safe-area-inset-bottom))}
+  @media(prefers-reduced-motion:reduce){.flashcard{transition:none}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="sign">ES</div>
+    <h1>DGT · Фразы из билетов<small>словосочетания и формулировки · 40 вопросов</small></h1>
+  </div>
+</header>
+<div class="roadline"></div>
+<nav>
+  <button id="tab-learn" class="active" onclick="showTab('learn')">Учить</button>
+  <button id="tab-quiz" onclick="showTab('quiz')">Тест</button>
+  <button id="tab-list" onclick="showTab('list')">Список</button>
+</nav>
+<main>
+  <div id="view-learn"></div>
+  <div id="view-quiz" style="display:none"></div>
+  <div id="view-list" style="display:none"></div>
+</main>
+
+<script src="data.js"></script>
+<script>
+/* ===== Активный набор (collocation | sentence) ===== */
+let activeType = 'collocation';
+function DATA(){ return activeType==='collocation' ? COLLOCATIONS : SENTENCES; }
+
+/* ===== Состояние Лейтнера: отдельные boxes на каждый набор ===== */
+let boxes = { collocation: COLLOCATIONS.map(()=>0), sentence: SENTENCES.map(()=>0) };
+function BX(){ return boxes[activeType]; }
+const STORE_KEY = 'dgt-phrases-offline-v1';
+let storageOK = true;
+
+function loadState(){
+  try{
+    const r=localStorage.getItem(STORE_KEY);
+    if(r){
+      const s=JSON.parse(r);
+      if(s.boxes){
+        if(Array.isArray(s.boxes.collocation)&&s.boxes.collocation.length===COLLOCATIONS.length) boxes.collocation=s.boxes.collocation;
+        if(Array.isArray(s.boxes.sentence)&&s.boxes.sentence.length===SENTENCES.length) boxes.sentence=s.boxes.sentence;
+      }
+      if(s.type) activeType=s.type;
+      if(s.filter) filterGroup=s.filter;
+      if(s.dir) qDir=s.dir;
+      if(typeof s.shuffle==='boolean') shuffleMode=s.shuffle;
+    }
+  }catch(e){ storageOK=false; }
+}
+function saveState(){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify({boxes,type:activeType,filter:filterGroup,dir:qDir,shuffle:shuffleMode,ts:Date.now()})); }
+  catch(e){ storageOK=false; }
+}
+window.addEventListener('pagehide', saveState);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') saveState(); });
+
+/* ===== Навигация ===== */
+let currentTab='learn';
+function showTab(t){
+  currentTab=t;
+  ['learn','quiz','list'].forEach(x=>{
+    document.getElementById('view-'+x).style.display=(x===t)?'':'none';
+    document.getElementById('tab-'+x).classList.toggle('active',x===t);
+  });
+  if(t==='learn') renderLearn();
+  if(t==='quiz') renderQuizStart();
+  if(t==='list') renderList();
+}
+function setType(tp){
+  if(activeType===tp) return;
+  activeType=tp; session=[]; quiz=[]; resetArmed=false;
+  saveState();
+  showTab(currentTab);
+}
+function typeSwitchHTML(){
+  return `<div class="typeswitch">
+    <button class="${activeType==='collocation'?'active':''}" onclick="setType('collocation')">Словосочетания<br><span style="font-weight:400;font-size:.74rem">${COLLOCATIONS.length} шт.</span></button>
+    <button class="${activeType==='sentence'?'active':''}" onclick="setType('sentence')">Формулировки<br><span style="font-weight:400;font-size:.74rem">${SENTENCES.length} шт.</span></button>
+  </div>`;
+}
+
+/* ===== Прогресс ===== */
+function progressHTML(scoped){
+  const data=DATA(), bx=BX();
+  const pool=data.map((w,i)=>({...w,i})).filter(w=> !scoped || filterGroup==='all' || w.g===filterGroup);
+  const n=pool.length;
+  const known=pool.filter(w=>bx[w.i]===3).length;
+  const pct=n?Math.round(known/n*100):0;
+  const inGroup=scoped&&filterGroup!=='all';
+  return `<div class="progress">
+    <div class="bigstat">${inGroup?GROUPS[filterGroup].name+': ':'Прогресс '}<b>${pct}%</b> · выучено ${known} из ${n}</div>
+    <div class="bar"><div class="seg" style="width:${pct}%;background:#1c7c43"></div><div class="seg" style="width:${100-pct}%;background:#d4d9de"></div></div>
+    <button class="reset-link" onclick="resetProgress()">⟲ Сбросить ${inGroup?'эту группу':'этот набор'}</button>
+  </div>`;
+}
+
+/* размер шрифта: фразы длиннее слов — ужимаем активнее */
+function wsize(t){
+  const L=t.length;
+  if(L<=14)return'2.6rem'; if(L<=26)return'2.1rem'; if(L<=42)return'1.7rem';
+  if(L<=70)return'1.4rem'; if(L<=110)return'1.18rem'; return'1.02rem';
+}
+
+/* ===== Учить ===== */
+let session=[], idx=0, flipped=false, filterGroup='all', shuffleMode=true;
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}}
+function buildSession(){
+  const data=DATA(), bx=BX();
+  let pool=data.map((w,i)=>({...w,i})).filter(w=> filterGroup==='all'||w.g===filterGroup);
+  let active=pool.filter(w=>bx[w.i]<3);
+  if(shuffleMode) shuffle(active);
+  session = filterGroup==='all' ? active.slice(0,20) : active;
+  idx=0; flipped=false;
+}
+function groupsInData(){
+  const present=new Set(DATA().map(w=>w.g));
+  return Object.entries(GROUPS).filter(([k])=>present.has(k));
+}
+function renderLearn(){
+  const v=document.getElementById('view-learn');
+  const chips=`<div class="filter-row">
+    <button class="chip ${filterGroup==='all'?'active':''}" onclick="setFilter('all')">Все группы</button>
+    ${groupsInData().map(([k,g])=>`<button class="chip ${filterGroup===k?'active':''}" onclick="setFilter('${k}')">${g.name}</button>`).join('')}
+  </div>`;
+  const toggle=`<div class="order-row"><span>Перемешивать карточки</span>
+    <label class="switch"><input type="checkbox" ${shuffleMode?'checked':''} onchange="toggleShuffle(this.checked)"><span class="slider"></span></label></div>`;
+  if(!session.length||idx>=session.length) buildSession();
+  if(!session.length){
+    v.innerHTML=typeSwitchHTML()+progressHTML(true)+chips+toggle+`
+      <div class="done-banner"><div class="sign-ok">✓</div>
+        <h2>${filterGroup==='all'?'Всё выучено':'Группа выучена'}</h2>
+        <p>${filterGroup==='all'?'Прогоните «Тест» или переключите набор сверху.':'Выберите другую группу или сбросьте кнопкой выше.'}</p>
+      </div>`;
+    return;
+  }
+  const w=session[idx], g=GROUPS[w.g];
+  v.innerHTML=typeSwitchHTML()+progressHTML(true)+chips+toggle+`
+    <div class="card-zone">
+      <div class="flashcard ${flipped?'flipped':''}" id="fc" onclick="flipCard()">
+        <div class="face front">
+          <span class="grouptag" style="background:${g.color}1a;color:${g.color}">${g.name}</span>
+          <div class="word" style="font-size:${wsize(w.en)}">${w.en}</div>
+          <div class="taphint">нажмите, чтобы перевернуть</div>
+        </div>
+        <div class="face back">
+          <div class="word" style="font-size:${wsize(w.ru)}">${w.ru}</div>
+          <div class="hintline">${w.en}${w.h?'<br>— '+w.h:''}</div>
+        </div>
+      </div>
+    </div>
+    <div class="answers">
+      <button class="btn-no" onclick="answer(false)" ${flipped?'':'disabled'}>Не знаю</button>
+      <button class="btn-yes" onclick="answer(true)" ${flipped?'':'disabled'}>Знаю</button>
+    </div>
+    <div class="session-info">Карточка ${idx+1} из ${session.length} в сессии</div>`;
+}
+function setFilter(g){filterGroup=g;session=[];saveState();renderLearn();}
+function toggleShuffle(on){shuffleMode=on;saveState();session=[];renderLearn();}
+function flipCard(){flipped=!flipped;
+  document.getElementById('fc').classList.toggle('flipped',flipped);
+  document.querySelectorAll('.answers button').forEach(b=>b.disabled=!flipped);
+}
+function answer(knew){
+  const w=session[idx], bx=BX();
+  if(knew){ bx[w.i]=3; } else { bx[w.i]=0; session.push(w); }
+  saveState(); idx++; flipped=false;
+  if(idx>=session.length) buildSession();
+  renderLearn();
+}
+let resetArmed=false, resetTimer=null;
+function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2600);}
+function resetProgress(){
+  const scopeAll=filterGroup==='all', bx=BX();
+  if(!resetArmed){
+    resetArmed=true;
+    document.querySelectorAll('.reset-link').forEach(b=>{b.textContent='Точно сбросить? Нажмите ещё раз';b.classList.add('armed');});
+    resetTimer=setTimeout(()=>{resetArmed=false;showTab(currentTab);},4000);
+    return;
+  }
+  clearTimeout(resetTimer);resetArmed=false;
+  let cnt=0;
+  DATA().forEach((w,i)=>{ if(scopeAll||w.g===filterGroup){bx[i]=0;cnt++;} });
+  saveState();session=[];showTab('learn');
+  const label=activeType==='collocation'?'словосочетаний':'формулировок';
+  toast(scopeAll?('Сброшено: все '+cnt+' '+label+' снова новые'):('Сброшена группа «'+GROUPS[filterGroup].name+'»: '+cnt+' шт.'));
+}
+
+/* ===== Тест ===== */
+let quiz=[], qIdx=0, qScore=0, qDir='en-ru', qLocked=false;
+function renderQuizStart(){
+  const v=document.getElementById('view-quiz');
+  v.innerHTML=typeSwitchHTML()+progressHTML()+`
+    <div class="dir-toggle">
+      <button class="${qDir==='en-ru'?'active':''}" onclick="setDir('en-ru')">EN → RU</button>
+      <button class="${qDir==='ru-en'?'active':''}" onclick="setDir('ru-en')">RU → EN</button>
+    </div>
+    <div class="done-banner">
+      <h2>Тест: 10 вопросов</h2>
+      <p>Случайные ${activeType==='collocation'?'словосочетания':'формулировки'}, 4 варианта. Цель перед экзаменом — 9–10 из 10.</p>
+      <button class="primary-btn" onclick="startQuiz()">Начать тест</button>
+    </div>`;
+}
+function setDir(d){qDir=d;saveState();renderQuizStart();}
+function startQuiz(){
+  const data=DATA();
+  const pool=data.map((w,i)=>({...w,i}));
+  shuffle(pool);
+  const take=Math.min(10,pool.length);
+  quiz=pool.slice(0,take).map(w=>{
+    const wrong=pool.filter(x=>x.i!==w.i); shuffle(wrong);
+    const opts=[w,...wrong.slice(0,3)]; shuffle(opts);
+    return {w,opts};
+  });
+  qIdx=0;qScore=0;qLocked=false;renderQuestion();
+}
+function renderQuestion(){
+  const v=document.getElementById('view-quiz');
+  if(qIdx>=quiz.length){
+    v.innerHTML=`<div class="quiz-result">
+      <div class="score">${qScore}/${quiz.length}</div>
+      <p style="color:var(--muted);margin:10px 0 6px">${qScore>=quiz.length-1?'Отлично, экзаменационная готовность.':qScore>=Math.ceil(quiz.length*0.7)?'Хорошо, добейте слабые в режиме «Учить».':'Вернитесь к карточкам — рано тестироваться.'}</p>
+      <button class="primary-btn" onclick="startQuiz()">Ещё раз</button>
+    </div>`;
+    return;
+  }
+  const q=quiz[qIdx];
+  const prompt=qDir==='en-ru'?q.w.en:q.w.ru;
+  v.innerHTML=`
+    <div class="quiz-progress">Вопрос ${qIdx+1} из ${quiz.length} · верно: ${qScore}</div>
+    <div class="quiz-q">
+      <div class="dirlabel">${qDir==='en-ru'?'переведите на русский':'переведите на английский'}</div>
+      <div class="word" style="font-size:${wsize(prompt)}">${prompt}</div>
+    </div>
+    <div class="opts">
+      ${q.opts.map((o,k)=>`<button id="opt${k}" onclick="pick(${k})">${qDir==='en-ru'?o.ru:o.en}</button>`).join('')}
+    </div>`;
+  qLocked=false;
+}
+function pick(k){
+  if(qLocked)return; qLocked=true;
+  const q=quiz[qIdx], bx=BX();
+  const correctIdx=q.opts.findIndex(o=>o.i===q.w.i);
+  const ok=k===correctIdx;
+  if(ok){qScore++;} else {bx[q.w.i]=Math.max(0,bx[q.w.i]-1);saveState();}
+  document.getElementById('opt'+correctIdx).classList.add('correct');
+  if(!ok) document.getElementById('opt'+k).classList.add('wrong');
+  setTimeout(()=>{qIdx++;renderQuestion();}, ok?650:1500);
+}
+
+/* ===== Список (для чтения) ===== */
+function renderList(){
+  const v=document.getElementById('view-list');
+  const data=DATA(), bx=BX();
+  let html=typeSwitchHTML()+progressHTML();
+  for(const [k,g] of groupsInData()){
+    const items=data.map((w,i)=>({...w,i})).filter(w=>w.g===k);
+    if(!items.length) continue;
+    html+=`<div class="group-block">
+      <div class="group-head"><span class="dot" style="border-color:${g.color}"></span>${g.name} · ${items.length}</div>
+      ${items.map(w=>`<div class="phraserow ${bx[w.i]===3?'learned':''}">
+        <span class="en">${w.en}</span>
+        <span class="ru">${w.ru}</span>
+        ${w.h?`<span class="hh">${w.h}</span>`:''}
+      </div>`).join('')}
+    </div>`;
+  }
+  v.innerHTML=html;
+}
+
+/* ===== init ===== */
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+loadState();
+if(!storageOK){ setTimeout(()=>toast('Хранилище недоступно: прогресс не сохранится'),600); }
+renderLearn();
+</script>
+</body>
+</html>
